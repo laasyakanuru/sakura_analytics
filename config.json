@@ -1,0 +1,16 @@
+{
+  "weather": {
+    "start_year": 1996,
+    "end_year": 2025,
+    "by_station_dir": "data/raw/weather_by_station",
+    "combined_file": "data/processed/01_source_data/03_weather/03_01_weather_all_stations_{start_year}_{end_year}.csv"
+  },
+  "station_metadata": {
+    "locations_file": "data/processed/01_source_data/01_station_metadata/01_01_station_locations.csv",
+    "elevations_file": "data/processed/01_source_data/01_station_metadata/01_02_station_elevations.csv"
+  },
+  "sakura": {
+    "flowering_file": "data/processed/01_source_data/02_sakura_dates/02_01_flowering_dates_1953_2025.csv",
+    "full_bloom_file": "data/processed/01_source_data/02_sakura_dates/02_02_full_bloom_dates_1953_2025.csv"
+  }
+}
