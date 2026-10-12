@@ -12,5 +12,15 @@
   "sakura": {
     "flowering_file": "data/processed/01_source_data/02_sakura_dates/02_01_flowering_dates_1953_2025.csv",
     "full_bloom_file": "data/processed/01_source_data/02_sakura_dates/02_02_full_bloom_dates_1953_2025.csv"
+  },
+  "cleaned_weather": {
+    "species": "Somei-yoshino",
+    "daily_file": "data/processed/02_cleaned_source_data/weather/02_cleaned_weather_daily_somei_1952_2025.csv.gz",
+    "features_file": "data/processed/02_cleaned_source_data/weather/03_weather_features_somei_station_year.csv",
+    "gap_log_file": "data/processed/02_cleaned_source_data/weather/04_weather_gap_log_somei.csv",
+    "relocations_file": "data/processed/02_cleaned_source_data/weather/05_weather_station_relocations_somei.csv",
+    "imputation_validation_file": "data/processed/02_cleaned_source_data/weather/06_weather_imputation_validation_somei.csv",
+    "eda_report": "reference/weather-eda.html",
+    "eda_notebook": "src/02_preprocess/03_eda_weather_rough.ipynb"
   }
 }
