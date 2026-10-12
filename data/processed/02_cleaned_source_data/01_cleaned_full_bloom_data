@@ -1,4 +1,4 @@
-station_id,year,full_bloom_date,full_bloom_doy,decade,bloom_date,bloom_doy,interval
+﻿station_id,year,full_bloom_date,full_bloom_doy,decade,bloom_date,bloom_doy,interval
 401,1953,1953-05-30,150.0,1950,1953-05-21,141.0,9.0
 401,1954,1954-05-27,147.0,1950,1954-05-17,137.0,10.0
 401,1955,1955-05-23,143.0,1950,1955-05-17,137.0,6.0
