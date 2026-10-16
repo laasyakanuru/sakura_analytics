@@ -1,0 +1,27 @@
+{
+  "train_years": [
+    1964,
+    2014
+  ],
+  "test_years": [
+    2015,
+    2025
+  ],
+  "station_lookback": 30,
+  "minimum_station_history": 10,
+  "station_fallback": "regional_then_national",
+  "temperature_lookback": 30,
+  "accumulation_start": "02-01",
+  "accumulation_end": "06-30",
+  "threshold_calibration": "training_median_at_observed_full_bloom",
+  "threshold_variants": [
+    "national",
+    "regional"
+  ],
+  "issue_dates": [
+    "feb1",
+    "mar1"
+  ],
+  "metric_aggregation": "single_held_out_test_sample",
+  "selected_before_test": true
+}

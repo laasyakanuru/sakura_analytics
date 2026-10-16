@@ -1,0 +1,9 @@
+Check,Result
+February observations,4365
+March observations,4365
+Unique stations,82
+Matching station-year records,4365
+Target mismatches,0
+Duplicate station-years,0
+Development observations,3837
+Reserved test observations,528
