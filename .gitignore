@@ -8,5 +8,5 @@ __pycache__/
 .venv/
 venv/
 
-# Local MySQL credentials (copy .env.example to .env)
+# Local MySQL credentials (copy sql/.env.example to sql/.env)
 .env

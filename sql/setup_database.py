@@ -1,10 +1,10 @@
 """One-command setup for the Sakura Yosoku MySQL warehouse (sakura_dw).
 
-    python3 setup_database.py                 # build everything on a fresh MySQL
-    python3 setup_database.py --checks        # only re-run the health checks
-    python3 setup_database.py --model-tables  # existing database: (re)build only
+    python3 sql/setup_database.py                 # build everything on a fresh MySQL
+    python3 sql/setup_database.py --checks        # only re-run the health checks
+    python3 sql/setup_database.py --model-tables  # existing database: (re)build only
                                               # steps 6-8 (05 tables, CSVs, checks)
-    python3 setup_database.py --reset         # drop sakura_dw and rebuild from scratch
+    python3 sql/setup_database.py --reset         # drop sakura_dw and rebuild from scratch
 
 Steps (about 5-15 minutes, mostly loading 2.2 million weather rows):
   1. sql/01_create_star_schema.sql        create sakura_dw + 5 tables
@@ -16,7 +16,8 @@ Steps (about 5-15 minutes, mostly loading 2.2 million weather rows):
   7. export data/model/*.csv              copies for teammates without MySQL
   8. health checks (02 + 04 + leakage/split checks) with a PASS/FAIL table
 
-MySQL credentials are asked once (or read from .env / environment variables,
+Run it from the project folder. MySQL credentials are asked once (or read from
+sql/.env / environment variables,
 see src/etl/db_connection.py) and passed on to every step.
 """
 import argparse
@@ -25,7 +26,7 @@ import sys
 import time
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[1]   # this file lives in sql/
 sys.path.insert(0, str(PROJECT_ROOT / "src" / "etl"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -108,7 +109,7 @@ def run_etl(script):
     result = subprocess.run([sys.executable, str(ETL_DIR / script)], cwd=PROJECT_ROOT)
     if result.returncode != 0:
         sys.exit(f"\n✗ {script} failed (see the error above). Nothing else was run.\n"
-                 f"  Fix the problem, then rebuild with:  python3 setup_database.py --reset")
+                 f"  Fix the problem, then rebuild with:  python3 sql/setup_database.py --reset")
 
 
 def database_state():
@@ -278,15 +279,15 @@ def main():
     if args.model_tables:
         if not exists or n_tables == 0:
             sys.exit(f"\nDatabase '{DATABASE}' does not exist yet - "
-                     f"run `python3 setup_database.py` first.")
+                     f"run `python3 sql/setup_database.py` first.")
         build_model_layer("1/2", "2/2")
         sys.exit(1 if run_checks() else 0)
 
     if exists and n_tables > 0 and not args.reset:
         print(f"\nDatabase '{DATABASE}' already exists ({n_tables} tables). Nothing was changed.\n"
-              f"  - Re-run the checks only:      python3 setup_database.py --checks\n"
-              f"  - Rebuild model tables + CSV:  python3 setup_database.py --model-tables\n"
-              f"  - Rebuild from scratch:        python3 setup_database.py --reset")
+              f"  - Re-run the checks only:      python3 sql/setup_database.py --checks\n"
+              f"  - Rebuild model tables + CSV:  python3 sql/setup_database.py --model-tables\n"
+              f"  - Rebuild from scratch:        python3 sql/setup_database.py --reset")
         sys.exit(0)
 
     if exists and args.reset:

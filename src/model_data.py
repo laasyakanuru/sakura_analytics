@@ -13,11 +13,11 @@ team uses identical rows, folds and metrics:
         print(fold, evaluate(valid[TARGET], model.predict(valid[X])))
 
 Where the data comes from (load_features(..., source="auto")):
-  - MySQL `sakura_dw`, if your password is in .env / environment variables
+  - MySQL `sakura_dw`, if your password is in sql/.env / environment variables
     and the server answers;
   - otherwise the CSV copies in data/model/ (committed to git), so you can
     model with Python only - no MySQL needed.
-Both give exactly the same table; setup_database.py refreshes the CSVs.
+Both give exactly the same table; sql/setup_database.py refreshes the CSVs.
 """
 import sys
 from pathlib import Path
@@ -72,7 +72,7 @@ def _from_csv(forecast_date):
     path = CSV_DIR / f"{FORECAST_TABLES[forecast_date]}.csv"
     if not path.exists():
         raise FileNotFoundError(f"{path} not found - run `git pull`, or build the "
-                                f"database with `python3 setup_database.py`.")
+                                f"database with `python3 sql/setup_database.py`.")
     return pd.read_csv(path, dtype={"station_id": str})
 
 

@@ -218,7 +218,7 @@ client — the server must also be installed and started) and the Python setup
 from 2.1.
 
 ```bash
-python3 setup_database.py
+python3 sql/setup_database.py
 ```
 
 It asks for your MySQL username and password once, then:
@@ -243,17 +243,17 @@ in the right order. They are still there to read or to run single queries.
 
 | Command | When |
 |---|---|
-| `python3 setup_database.py --checks` | Check an existing database (read-only) |
-| `python3 setup_database.py --model-tables` | You already have `sakura_dw` and only need the new or updated model tables and CSVs (e.g. after pulling a change to `05`) — about 1 minute |
-| `python3 setup_database.py --reset` | Delete `sakura_dw` and rebuild everything |
+| `python3 sql/setup_database.py --checks` | Check an existing database (read-only) |
+| `python3 sql/setup_database.py --model-tables` | You already have `sakura_dw` and only need the new or updated model tables and CSVs (e.g. after pulling a change to `05`) — about 1 minute |
+| `python3 sql/setup_database.py --reset` | Delete `sakura_dw` and rebuild everything |
 
 If you changed data or SQL and the CSVs in `data/model/` changed, commit them
 so Python-only teammates get the update.
 
 ### 4.3 Saving your password (optional)
 
-Copy `.env.example` to `.env` and fill in your password; scripts then stop
-asking, and `load_features()` reads from MySQL instead of the CSVs. `.env` is
+Copy `sql/.env.example` to `sql/.env` and fill in your password; scripts then
+stop asking, and `load_features()` reads from MySQL instead of the CSVs. `.env` is
 git-ignored — never commit it.
 
 ---
@@ -365,11 +365,11 @@ From a fresh build on MySQL 8.0 (2026-10-16):
 ```
 README.md                  this file
 requirements.txt           Python packages
-setup_database.py          build / check the MySQL database, export the CSVs
-.env.example               template for saving your MySQL login (copy to .env)
 data/model/                model_features_feb1.csv, model_features_mar1.csv
 data/processed/, data/raw/ source and cleaned data used by the loaders
 sql/                       01-05 SQL files
+sql/setup_database.py      build / check the MySQL database, export the CSVs
+sql/.env.example           template for saving your MySQL login (copy to sql/.env)
 sql/star_schema/           star schema ERD (.png) + Workbench model (.mwb)
 src/model_data.py          shared loading, folds, metrics, baseline
 src/example_model.py       template - copy to src/models/<your_model>.py
@@ -392,5 +392,5 @@ reference/                 EDA reports
 | `Access denied for user ...` | Wrong MySQL username or password — use the ones you use in MySQL Workbench |
 | `'cryptography' package is required` | `python3 -m pip install -r requirements.txt` |
 | `Database 'sakura_dw' already exists` | Use `--checks`, `--model-tables` or `--reset` (4.2) |
-| A health check shows FAIL | Run `python3 setup_database.py --reset` once; if it still fails, share the PASS/FAIL table with the team |
+| A health check shows FAIL | Run `python3 sql/setup_database.py --reset` once; if it still fails, share the PASS/FAIL table with the team |
 | `ValueError: Input X contains NaN` | You added a column that is not from `load_features()`; the provided features have no empty values |

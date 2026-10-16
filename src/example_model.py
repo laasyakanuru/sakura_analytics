@@ -17,10 +17,10 @@ that on for the champion model, after the team has picked it on validation.
 import sys
 from pathlib import Path
 
-# Find the project root (the folder containing setup_database.py), so this file
+# Find the project root (the folder containing requirements.txt), so this file
 # works from src/, src/models/ or anywhere else inside the project.
 PROJECT_ROOT = next(p for p in Path(__file__).resolve().parents
-                    if (p / "setup_database.py").exists())
+                    if (p / "requirements.txt").exists())
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sklearn.linear_model import LinearRegression  # noqa: E402

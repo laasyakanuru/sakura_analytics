@@ -114,7 +114,7 @@ GROUP BY b.station_id,s.location,s.region
 ORDER BY missing_seasons DESC,b.station_id;
 
 /* NOTES:
-   Executed end-to-end on MySQL 8.0 on 2026-10-16 (fresh build via setup_database.py):
+   Executed end-to-end on MySQL 8.0 on 2026-10-16 (fresh build via sql/setup_database.py):
    A1: 5942 MATCH / 44 MISSING / 0 MISMATCH for Jan, Feb, Mar (Apr: 5943 / 43 / 0).
    A2: precip 5944 MATCH / 42 MISSING; sunshine 5376 MATCH / 610 MISSING; 0 MISMATCH.
    B2, B3, C2 return zero rows. B1 (~26k rows) and C1 (~5k rows) are long listings:

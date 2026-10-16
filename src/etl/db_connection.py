@@ -4,8 +4,8 @@ Credentials are looked up in this order, so you type them at most once:
   1. Environment variables  SAKURA_DB_USER, SAKURA_DB_PASSWORD,
                             SAKURA_DB_HOST (default localhost),
                             SAKURA_DB_PORT (default 3306)
-  2. A `.env` file in the project root with the same keys (git-ignored;
-     copy `.env.example` to `.env` if you want to skip the prompt).
+  2. A `sql/.env` file with the same keys (git-ignored; copy
+     `sql/.env.example` to `sql/.env` if you want to skip the prompt).
   3. An interactive prompt.
 """
 import os
@@ -20,9 +20,11 @@ DATABASE = "sakura_dw"
 
 
 def _read_env_file():
-    env_file = PROJECT_ROOT / ".env"
+    # sql/.env is the documented place; a .env in the project root also works.
+    env_file = next((f for f in (PROJECT_ROOT / "sql" / ".env", PROJECT_ROOT / ".env")
+                     if f.exists()), None)
     values = {}
-    if env_file.exists():
+    if env_file is not None:
         for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
@@ -32,7 +34,7 @@ def _read_env_file():
 
 
 def credentials_configured():
-    """True if a password is available without prompting (env var or .env)."""
+    """True if a password is available without prompting (env var or sql/.env)."""
     return bool(os.environ.get("SAKURA_DB_PASSWORD")
                 or _read_env_file().get("SAKURA_DB_PASSWORD"))
 
