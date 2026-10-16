@@ -1,0 +1,15 @@
+{
+  "fit_through_year": 2014,
+  "national_threshold": 746.1,
+  "regional_thresholds": {
+    "Chubu": 717.4,
+    "Chugoku": 747.2,
+    "Hokkaido": 573.8,
+    "Kansai": 762.3499999999999,
+    "Kanto": 786.05,
+    "Kyushu": 845.0,
+    "Shikoku": 799.2,
+    "Tohoku": 664.7
+  },
+  "calibration_observations": 3837
+}
