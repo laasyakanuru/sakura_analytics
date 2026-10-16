@@ -1,8 +1,10 @@
 """One-command setup for the Sakura Yosoku MySQL warehouse (sakura_dw).
 
-    python setup_database.py              # build everything on a fresh MySQL
-    python setup_database.py --reset      # drop sakura_dw and rebuild from scratch
-    python setup_database.py --checks     # only re-run the health checks
+    python3 setup_database.py                 # build everything on a fresh MySQL
+    python3 setup_database.py --checks        # only re-run the health checks
+    python3 setup_database.py --model-tables  # existing database: (re)build only
+                                              # steps 6-8 (05 tables, CSVs, checks)
+    python3 setup_database.py --reset         # drop sakura_dw and rebuild from scratch
 
 Steps (about 5-15 minutes, mostly loading 2.2 million weather rows):
   1. sql/01_create_star_schema.sql        create sakura_dw + 5 tables
@@ -11,7 +13,8 @@ Steps (about 5-15 minutes, mostly loading 2.2 million weather rows):
   4. src/etl/load_bloom_season.py         fact_bloom_season  (5,986 rows)
   5. sql/03_olap_queries.sql              vw_sakura_march1_features view
   6. sql/05_model_feature_tables.sql      ref_cv_split + model_features_feb1/mar1
-  7. health checks (02 + 04 + leakage/split checks) with a PASS/FAIL table
+  7. export data/model/*.csv              copies for teammates without MySQL
+  8. health checks (02 + 04 + leakage/split checks) with a PASS/FAIL table
 
 MySQL credentials are asked once (or read from .env / environment variables,
 see src/etl/db_connection.py) and passed on to every step.
@@ -24,10 +27,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT / "src" / "etl"))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sqlalchemy import text  # noqa: E402
 
 from db_connection import DATABASE, get_engine  # noqa: E402
+from model_data import export_csvs  # noqa: E402
 
 SQL_DIR = PROJECT_ROOT / "sql"
 ETL_DIR = PROJECT_ROOT / "src" / "etl"
@@ -103,7 +108,7 @@ def run_etl(script):
     result = subprocess.run([sys.executable, str(ETL_DIR / script)], cwd=PROJECT_ROOT)
     if result.returncode != 0:
         sys.exit(f"\n✗ {script} failed (see the error above). Nothing else was run.\n"
-                 f"  Fix the problem, then rebuild with:  python setup_database.py --reset")
+                 f"  Fix the problem, then rebuild with:  python3 setup_database.py --reset")
 
 
 def database_state():
@@ -116,6 +121,14 @@ def database_state():
                                    "WHERE table_schema = :db"), {"db": DATABASE}).scalar_one()
     engine.dispose()
     return bool(exists), tables
+
+
+def build_model_layer(n_tables, n_csv):
+    step(f"{n_tables}  Build model tables (sql/05_model_feature_tables.sql)")
+    run_sql_file(SQL_DIR / "05_model_feature_tables.sql")
+    print("Created ref_cv_split, model_features_feb1, model_features_mar1.")
+    step(f"{n_csv}  Export CSV copies (data/model/)")
+    export_csvs()
 
 
 def step(title):
@@ -206,13 +219,29 @@ def run_checks():
                 ok, shown = False, f"error: {str(exc).splitlines()[0][:60]}"
             failures += not ok
             print(f"  {'PASS' if ok else 'FAIL'}  {desc:<48} {shown:>12}  (expected {expected:,})")
+        # every column except the fold labels must be filled in both model tables
+        for table in ("model_features_feb1", "model_features_mar1"):
+            desc = f"NULL values in {table}"
+            try:
+                cols = [r[0] for r in conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_schema = :db AND table_name = :t AND column_name NOT LIKE 'fold%'"),
+                    {"db": DATABASE, "t": table})]
+                value = int(conn.execute(text(
+                    f"SELECT {' + '.join(f'SUM(`{c}` IS NULL)' for c in cols)} FROM {table}")).scalar())
+                ok, shown = value == 0 and len(cols) > 0, f"{value:,}"
+            except Exception as exc:
+                ok, shown = False, f"error: {str(exc).splitlines()[0][:60]}"
+            failures += not ok
+            print(f"  {'PASS' if ok else 'FAIL'}  {desc:<48} {shown:>12}  (expected 0)")
     engine.dispose()
     print()
     if failures:
         print(f"✗ {failures} check(s) failed. See README.md > Troubleshooting.")
     else:
         print("✓ All checks passed. sakura_dw is ready.\n"
-              "  Model data:  model_features_feb1, model_features_mar1 (see README.md)")
+              "  Model data:  model_features_feb1 / model_features_mar1 (MySQL)\n"
+              "               data/model/*.csv (same tables for Python-only use)")
     return failures
 
 
@@ -223,6 +252,9 @@ def main():
                         help="DROP the existing sakura_dw database and rebuild it")
     parser.add_argument("--checks", action="store_true",
                         help="only run the health checks on the existing database")
+    parser.add_argument("--model-tables", action="store_true",
+                        help="existing database: rebuild the 05 model tables, "
+                             "export the CSVs and run the checks")
     parser.add_argument("--yes", action="store_true", help="do not ask before --reset")
     args = parser.parse_args()
 
@@ -243,10 +275,18 @@ def main():
     if args.checks:
         sys.exit(1 if run_checks() else 0)
 
+    if args.model_tables:
+        if not exists or n_tables == 0:
+            sys.exit(f"\nDatabase '{DATABASE}' does not exist yet - "
+                     f"run `python3 setup_database.py` first.")
+        build_model_layer("1/2", "2/2")
+        sys.exit(1 if run_checks() else 0)
+
     if exists and n_tables > 0 and not args.reset:
         print(f"\nDatabase '{DATABASE}' already exists ({n_tables} tables). Nothing was changed.\n"
-              f"  - Re-run the checks only:   python setup_database.py --checks\n"
-              f"  - Rebuild from scratch:     python setup_database.py --reset")
+              f"  - Re-run the checks only:      python3 setup_database.py --checks\n"
+              f"  - Rebuild model tables + CSV:  python3 setup_database.py --model-tables\n"
+              f"  - Rebuild from scratch:        python3 setup_database.py --reset")
         sys.exit(0)
 
     if exists and args.reset:
@@ -261,26 +301,24 @@ def main():
         engine.dispose()
         print(f"Dropped {DATABASE}.")
 
-    step("1/6  Create schema (sql/01_create_star_schema.sql)")
+    step("1/7  Create schema (sql/01_create_star_schema.sql)")
     run_sql_file(SQL_DIR / "01_create_star_schema.sql")
     print("Created sakura_dw with dim_date and dim_season filled.")
 
-    step("2/6  Load stations (src/etl/load_stations.py)")
+    step("2/7  Load stations (src/etl/load_stations.py)")
     run_etl("load_stations.py")
 
-    step("3/6  Load daily weather (src/etl/load_daily_weather.py) - the slow step")
+    step("3/7  Load daily weather (src/etl/load_daily_weather.py) - the slow step")
     run_etl("load_daily_weather.py")
 
-    step("4/6  Load bloom seasons (src/etl/load_bloom_season.py)")
+    step("4/7  Load bloom seasons (src/etl/load_bloom_season.py)")
     run_etl("load_bloom_season.py")
 
-    step("5/6  Create analysis view (sql/03_olap_queries.sql)")
+    step("5/7  Create analysis view (sql/03_olap_queries.sql)")
     run_sql_file(SQL_DIR / "03_olap_queries.sql")
     print("Created vw_sakura_march1_features.")
 
-    step("6/6  Build model tables (sql/05_model_feature_tables.sql)")
-    run_sql_file(SQL_DIR / "05_model_feature_tables.sql")
-    print("Created ref_cv_split, model_features_feb1, model_features_mar1.")
+    build_model_layer("6/7", "7/7")
 
     failures = run_checks()
     print(f"Total time: {(time.time() - started) / 60:.1f} min")

@@ -21,8 +21,19 @@
 
    Row filter "temp_missing_days_to_cutoff = 0" only looks at days up to the
    cutoff, so it is decided with information available on the forecast date.
+
+   Precipitation and sunshine are never imputed in the daily table, so the
+   monthly totals here are (mean of observed days) x (days in month); the
+   *_missing_days columns show how many days were estimated this way. If a
+   whole month is missing (1 row: station 604, Feb 2008 sunshine) it is filled
+   with the same-year mean of the other stations in the same region - data that
+   also exists on the forecast date. Result: no NULL feature values.
 */
 USE sakura_dw;
+-- MySQL Workbench runs with safe-update mode on, which blocks the UPDATEs
+-- below; switch it off for this script only and restore it at the end.
+SET @saved_safe_updates = @@SQL_SAFE_UPDATES;
+SET SQL_SAFE_UPDATES = 0;
 
 /* ------------------------------------------------------------------
    1. Shared train / validation / test split (one row per bloom year)
@@ -81,9 +92,9 @@ FROM (
            ROUND(SUM(CASE WHEN month = 1 THEN GREATEST(tm - 5, 0) END), 2) AS gdd5_jan,
            ROUND(SUM(CASE WHEN month = 1 THEN tx END), 2) AS cum_tmax_jan,
            ROUND(SUM(CASE WHEN month = 1 THEN tm END), 2) AS cum_tmean_jan,
-           ROUND(SUM(CASE WHEN month = 1 THEN pr END), 2) AS precip_jan_mm,
+           ROUND(AVG(CASE WHEN month = 1 THEN pr END) * SUM(month = 1), 2) AS precip_jan_mm,
            SUM(month = 1 AND pr IS NULL) AS precip_jan_missing_days,
-           ROUND(SUM(CASE WHEN month = 1 THEN su END), 2) AS sunshine_jan_h,
+           ROUND(AVG(CASE WHEN month = 1 THEN su END) * SUM(month = 1), 2) AS sunshine_jan_h,
            SUM(month = 1 AND su IS NULL) AS sunshine_jan_missing_days
     FROM (
         SELECT w.station_id, d.year + (d.month >= 10) AS bloom_year, d.month,
@@ -105,6 +116,20 @@ WHERE s.cherry_species = 'Somei-yoshino'
   AND a.temp_missing_days_to_cutoff = 0;
 
 ALTER TABLE model_features_feb1 ADD PRIMARY KEY (station_id, bloom_year);
+
+-- Whole month missing -> same-year regional mean (see header).
+UPDATE model_features_feb1 t
+JOIN (SELECT region, bloom_year, ROUND(AVG(precip_jan_mm), 2) AS fill_value
+      FROM model_features_feb1 WHERE precip_jan_mm IS NOT NULL GROUP BY region, bloom_year) r
+  ON r.region = t.region AND r.bloom_year = t.bloom_year
+SET t.precip_jan_mm = r.fill_value
+WHERE t.precip_jan_mm IS NULL;
+UPDATE model_features_feb1 t
+JOIN (SELECT region, bloom_year, ROUND(AVG(sunshine_jan_h), 2) AS fill_value
+      FROM model_features_feb1 WHERE sunshine_jan_h IS NOT NULL GROUP BY region, bloom_year) r
+  ON r.region = t.region AND r.bloom_year = t.bloom_year
+SET t.sunshine_jan_h = r.fill_value
+WHERE t.sunshine_jan_h IS NULL;
 
 /* ------------------------------------------------------------------
    3. Mar 1 forecast: weather 1 Oct (Y-1) .. 28/29 Feb (Y)
@@ -141,9 +166,9 @@ FROM (
            ROUND(SUM(CASE WHEN month = 2 THEN GREATEST(tm - 5, 0) END), 2) AS gdd5_feb,
            ROUND(SUM(CASE WHEN month = 2 THEN tx END), 2) AS cum_tmax_feb,
            ROUND(SUM(CASE WHEN month = 2 THEN tm END), 2) AS cum_tmean_feb,
-           ROUND(SUM(CASE WHEN month = 2 THEN pr END), 2) AS precip_feb_mm,
+           ROUND(AVG(CASE WHEN month = 2 THEN pr END) * SUM(month = 2), 2) AS precip_feb_mm,
            SUM(month = 2 AND pr IS NULL) AS precip_feb_missing_days,
-           ROUND(SUM(CASE WHEN month = 2 THEN su END), 2) AS sunshine_feb_h,
+           ROUND(AVG(CASE WHEN month = 2 THEN su END) * SUM(month = 2), 2) AS sunshine_feb_h,
            SUM(month = 2 AND su IS NULL) AS sunshine_feb_missing_days
     FROM (
         SELECT w.station_id, d.year + (d.month >= 10) AS bloom_year, d.month,
@@ -165,6 +190,22 @@ WHERE s.cherry_species = 'Somei-yoshino'
   AND a.temp_missing_days_to_cutoff = 0;
 
 ALTER TABLE model_features_mar1 ADD PRIMARY KEY (station_id, bloom_year);
+
+-- Whole month missing -> same-year regional mean (see header).
+UPDATE model_features_mar1 t
+JOIN (SELECT region, bloom_year, ROUND(AVG(precip_feb_mm), 2) AS fill_value
+      FROM model_features_mar1 WHERE precip_feb_mm IS NOT NULL GROUP BY region, bloom_year) r
+  ON r.region = t.region AND r.bloom_year = t.bloom_year
+SET t.precip_feb_mm = r.fill_value
+WHERE t.precip_feb_mm IS NULL;
+UPDATE model_features_mar1 t
+JOIN (SELECT region, bloom_year, ROUND(AVG(sunshine_feb_h), 2) AS fill_value
+      FROM model_features_mar1 WHERE sunshine_feb_h IS NOT NULL GROUP BY region, bloom_year) r
+  ON r.region = t.region AND r.bloom_year = t.bloom_year
+SET t.sunshine_feb_h = r.fill_value
+WHERE t.sunshine_feb_h IS NULL;
+
+SET SQL_SAFE_UPDATES = @saved_safe_updates;
 
 /* ------------------------------------------------------------------
    4. Quick summary (rows per split)

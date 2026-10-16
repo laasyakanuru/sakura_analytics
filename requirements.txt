@@ -1,5 +1,6 @@
 pandas>=2.0
 numpy>=1.24
+scikit-learn>=1.3
 SQLAlchemy>=2.0
 PyMySQL>=1.1
 cryptography>=41   # needed by PyMySQL for MySQL 8's default password login

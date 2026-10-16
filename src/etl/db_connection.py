@@ -31,6 +31,12 @@ def _read_env_file():
     return values
 
 
+def credentials_configured():
+    """True if a password is available without prompting (env var or .env)."""
+    return bool(os.environ.get("SAKURA_DB_PASSWORD")
+                or _read_env_file().get("SAKURA_DB_PASSWORD"))
+
+
 def get_credentials():
     """Return (user, password, host, port); prompts only for what is missing."""
     file_values = _read_env_file()
