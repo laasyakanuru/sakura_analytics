@@ -1,27 +1,59 @@
 # Sakura Yosoku — MySQL Star Schema
 
-Cleaned and reorganized from the user's `sakura.sql` (716 lines of interactive work).
+**Most people do not need to run these files by hand.** `python3 setup_database.py`
+in the project root runs them in the right order and checks the results
+(see the root `README.md`). This page explains what each file does.
 
 ## Files
 
-1. `01_create_star_schema.sql` — Creates **five final tables**, including `dim_date` (1952–2025) and `dim_season` (1953–2025). **Run on a NEW/EMPTY `sakura_dw` only**; it does not populate station metadata or fact data.
-2. `02_validation.sql` — Read-only checks for row counts, coverage, missing targets, duplicate keys, and FK consistency. Run after loading.
-3. `03_olap_queries.sql` — Historical OLAP queries and a March 1 feature view.
+| File | What it does | Changes data? |
+|---|---|---|
+| `01_create_star_schema.sql` | Creates `sakura_dw` and the five tables; fills `dim_date` (1952–2025) and `dim_season` (1953–2025). Run **once on an empty server** — it fails if the tables already exist. | Yes |
+| `02_validation.sql` | Row counts, coverage, missing targets, duplicate keys and foreign-key checks. | No |
+| `03_olap_queries.sql` | Descriptive OLAP queries (region, decade, earliest stations, Jan temperature, imputation) and the `vw_sakura_march1_features` view. | Creates a view |
+| `04_season_integration_validation.sql` | Date-to-season mapping, grain checks and recomputation of stored features from daily weather. See `README_04_SEASON_INTEGRATION_VALIDATION.md`. | No |
+| `05_model_feature_tables.sql` | Builds `ref_cv_split`, `model_features_feb1` and `model_features_mar1` — the leakage-safe modelling inputs agreed in the Model Development Meeting. Safe to re-run. | Rebuilds those 3 tables |
+| `schema_design/` | ERD image and MySQL Workbench model (`.mwb`). | — |
 
-## Rebuild sequence for another group member
+## Build order
 
-1. Install MySQL 8+, Python, pandas, SQLAlchemy, and PyMySQL; clone `sakura_analytics`.
-2. On a **new/empty** MySQL instance, run `01_create_star_schema.sql`.
-3. Populate `dim_station` from the three metadata CSVs in `data/processed/01_source_data/01_station_metadata/` (join on `station_id`). This import step was done via MySQL Workbench staging tables in the original workflow and is **not automated in these three SQL scripts**. Confirm 102 station records before proceeding.
-4. Run `python3 src/etl/load_daily_weather.py`, then `python3 src/etl/load_bloom_season.py`. These scripts must exist in the repository and connect to `sakura_dw`; do not upload credentials.
-5. Run `02_validation.sql`, then `03_olap_queries.sql`.
+1. `01_create_star_schema.sql`
+2. `src/etl/load_stations.py` → `dim_station` (102 rows)
+3. `src/etl/load_daily_weather.py` → `fact_daily_weather` (2,216,378 rows)
+4. `src/etl/load_bloom_season.py` → `fact_bloom_season` (5,986 rows)
+5. `03_olap_queries.sql`, then `05_model_feature_tables.sql`
+6. `02_validation.sql` and `04_season_integration_validation.sql` to check
 
-## Scope and caveats
+`setup_database.py` does exactly this. To run a single file by hand in MySQL
+Workbench: File → Open SQL Script → ⚡ Execute. For `04`, raise the result-row
+limit first (B1 lists ~26,000 rows).
 
-- `dim_station`: 102 source stations (82 Somei-yoshino + 20 other-species stations).
-- `fact_daily_weather`: 82 Somei-yoshino stations, 1952–2025, expected 2,216,378 rows.
-- `fact_bloom_season`: 82 stations × 73 seasons, expected 5,986 rows; 825 missing full-bloom dates.
-- Recommended initial modelling filter: bloom year >= 1964, season temperature complete, and observed full-bloom target.
-- Weather features after a forecast issue date must never be used for that issue date. The March 1 view is only a **candidate** training extract.
-- These scripts do **not** include an export of the existing MySQL database or actual ETL Python files.
-- The original interactive `sakura.sql` includes temporary deletes, restorations, repeated queries, and ALTER statements; do not rerun it as a deployment script.
+## Expected results (fresh build, 2026-10-16)
+
+- Row counts: 102 / 27,029 / 73 / 2,216,378 / 5,986.
+- `fact_bloom_season`: 82 Somei-yoshino stations × 73 seasons; 825 missing full-bloom dates.
+- `dim_station`: 102 stations (82 Somei-yoshino, 10 Ezo-yamazakura, 9 Hikan-zakura, 1 Chishima-zakura).
+- Duplicate-key and foreign-key checks: 0.
+- `04` A1/A2: 0 mismatches (Jan–Mar 44 missing, Apr 43; sunshine 610 missing).
+- `model_features_feb1` / `model_features_mar1`: 4,365 rows each (3,837 development, 528 test).
+
+## Why `05` recomputes features instead of using `fact_bloom_season`
+
+Several stored columns are not safe for the agreed forecast dates:
+
+- `chill_days_0_7c_nov_feb`, `tmin_lowest_nov_feb` include February → not allowed for Feb 1.
+- `season_temp_complete` looks at Oct–May, and `gdd5_*` / `cum_*` were set to NULL
+  when any Feb–May day was missing → uses information after the forecast date.
+- `rule600_tmax_pred_doy`, `rule400_tmean_pred_doy` need temperatures until the
+  threshold is reached (always after Mar 1).
+
+`05` recomputes every feature from `fact_daily_weather` with an explicit date cutoff;
+where definitions overlap, the values equal the stored ones exactly.
+
+## Notes
+
+- `vw_sakura_march1_features` (from `03`) is kept for the descriptive analysis; for
+  modelling use `model_features_mar1`, which avoids the issues above (it also keeps
+  one station-year the view drops because of a missing day in March–May).
+- The original interactive `sakura.sql` contains temporary deletes, restorations and
+  ALTER statements; do not rerun it as a deployment script.

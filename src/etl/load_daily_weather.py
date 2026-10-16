@@ -1,9 +1,9 @@
 from pathlib import Path
-from getpass import getpass
 
 import pandas as pd
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
+from sqlalchemy import text
+
+from db_connection import get_engine
 
 # 1. Locate project directory
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -15,19 +15,7 @@ DATA_PATH = (
 )
 
 # 2. Connect to local MySQL
-username = input("MySQL username [root]: ").strip() or "root"
-password = getpass("MySQL password: ")
-
-url = URL.create(
-    "mysql+pymysql",
-    username=username,
-    password=password,
-    host="localhost",
-    port=3306,
-    database="sakura_dw"
-)
-
-engine = create_engine(url, pool_pre_ping=True)
+engine = get_engine()
 
 # 3. Check existing records
 with engine.connect() as conn:

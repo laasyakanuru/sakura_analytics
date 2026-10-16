@@ -59,7 +59,7 @@ WITH monthly AS (
  FROM fact_daily_weather w JOIN dim_date d ON w.date_key=d.date_key
  WHERE d.month BETWEEN 1 AND 4
  GROUP BY w.station_id,d.year,d.month
-), stored AS (
+), stored_vals AS (
  SELECT station_id,season_key,1 AS month_no,tmean_jan AS stored_mean FROM fact_bloom_season
  UNION ALL SELECT station_id,season_key,2,tmean_feb FROM fact_bloom_season
  UNION ALL SELECT station_id,season_key,3,tmean_mar FROM fact_bloom_season
@@ -69,7 +69,7 @@ WITH monthly AS (
         CASE WHEN b.stored_mean IS NULL OR m.calculated_mean IS NULL THEN 'MISSING'
              WHEN ABS(b.stored_mean-m.calculated_mean)<=0.011 THEN 'MATCH'
              ELSE 'MISMATCH' END AS status
- FROM stored b LEFT JOIN monthly m
+ FROM stored_vals b LEFT JOIN monthly m
  ON b.station_id=m.station_id AND b.season_key=m.bloom_year AND b.month_no=m.month
 )
 SELECT month_no,status,COUNT(*) AS station_seasons
@@ -114,8 +114,11 @@ GROUP BY b.station_id,s.location,s.region
 ORDER BY missing_seasons DESC,b.station_id;
 
 /* NOTES:
-   Prior local result: 5942 matching Jan/Feb records, 44 missing, 0 mismatches.
-   This script has NOT been executed against your local MySQL instance.
+   Executed end-to-end on MySQL 8.0 on 2026-10-16 (fresh build via setup_database.py):
+   A1: 5942 MATCH / 44 MISSING / 0 MISMATCH for Jan, Feb, Mar (Apr: 5943 / 43 / 0).
+   A2: precip 5944 MATCH / 42 MISSING; sunshine 5376 MATCH / 610 MISSING; 0 MISMATCH.
+   B2, B3, C2 return zero rows. B1 (~26k rows) and C1 (~5k rows) are long listings:
+   raise the Workbench row limit (or add LIMIT) before running them.
    Recalculate derived features if daily weather or ETL rules change.
-   Review issue-date leakage and cardinality independently.
+   Leakage-safe model inputs for Feb 1 / Mar 1 are in 05_model_feature_tables.sql.
 */

@@ -1,6 +1,6 @@
 # Sakura Yosoku — Season Integration & Feature Validation
 
-**Companion to:** `04_sakura_quality_and_integration.sql`  
+**Companion to:** `04_season_integration_validation.sql`  
 **Database:** `sakura_dw` | **Compatibility:** MySQL 8+
 
 ## Why this SQL add-on matters for modelling

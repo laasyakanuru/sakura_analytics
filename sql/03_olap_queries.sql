@@ -50,6 +50,7 @@ GROUP BY s.region ORDER BY imputation_pct DESC;
 -- observations through end of February, but additional availability checks
 -- are still needed for southern stations and historical forecast timing.
 -- This view is NOT a final leakage-validated training dataset.
+-- For modelling use model_features_mar1 / model_features_feb1 (05_model_feature_tables.sql).
 CREATE OR REPLACE VIEW vw_sakura_march1_features AS
 SELECT f.station_id, s.location, s.region, s.latitude, s.longitude,
        s.elevation_m, f.season_key AS bloom_year,
