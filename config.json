@@ -6,12 +6,13 @@
     "combined_file": "data/processed/01_source_data/03_weather/03_01_weather_all_stations_{start_year}_{end_year}.csv"
   },
   "station_metadata": {
-    "locations_file": "data/processed/01_source_data/01_station_metadata/01_01_station_locations.csv",
-    "elevations_file": "data/processed/01_source_data/01_station_metadata/01_02_station_elevations.csv"
+    "locations_file": "data/processed/01_source_data/01_station_metadata/01_01_station_name.csv",
+    "elevations_file": "data/processed/01_source_data/01_station_metadata/01_02_station_elevations.csv",
+    "species_file": "data/processed/01_source_data/01_station_metadata/01_03_cherry_species.csv"
   },
   "sakura": {
-    "flowering_file": "data/processed/01_source_data/02_sakura_dates/02_01_flowering_dates_1953_2025.csv",
-    "full_bloom_file": "data/processed/01_source_data/02_sakura_dates/02_02_full_bloom_dates_1953_2025.csv"
+    "flowering_file": "data/processed/01_source_data/02_sakura_dates/02_01_sakura_flowering_1953_2025.csv",
+    "full_bloom_file": "data/processed/01_source_data/02_sakura_dates/02_02_sakura_full_bloom_1953_2025.csv"
   },
   "cleaned_weather": {
     "species": "Somei-yoshino",

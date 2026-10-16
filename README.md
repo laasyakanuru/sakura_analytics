@@ -3,6 +3,9 @@
 Predict the Somei-yoshino full-bloom date (day of year) for 82 JMA stations at
 two forecast dates, **Feb 1** and **Mar 1**, from daily weather 1952–2025.
 
+**Star schema (ERD):** [`sql/star_schema/`](sql/star_schema/) — diagram in
+[section 5.1](#51-star-schema-sakura_dw).
+
 Contents
 1. [Which path is yours?](#1-which-path-is-yours)
 2. [Modelling with Python only (most teammates)](#2-modelling-with-python-only-most-teammates)
@@ -259,8 +262,11 @@ git-ignored — never commit it.
 
 ### 5.1 Star schema (`sakura_dw`)
 
-ERD: `sql/schema_design/Sakura_Star_Schema.png` (Workbench model:
-`Sakura_Warehouse.mwb`).
+![Sakura star schema](sql/star_schema/Sakura_Star_Schema.png)
+
+Files in [`sql/star_schema/`](sql/star_schema/): `Sakura_Star_Schema.png`
+(the diagram above) and `Sakura_Warehouse.mwb` (open in MySQL Workbench via
+File → Open Model).
 
 | Table | Grain | Rows |
 |---|---|---|
@@ -363,7 +369,8 @@ setup_database.py          build / check the MySQL database, export the CSVs
 .env.example               template for saving your MySQL login (copy to .env)
 data/model/                model_features_feb1.csv, model_features_mar1.csv
 data/processed/, data/raw/ source and cleaned data used by the loaders
-sql/                       01-05 SQL files, schema_design/ (ERD)
+sql/                       01-05 SQL files
+sql/star_schema/           star schema ERD (.png) + Workbench model (.mwb)
 src/model_data.py          shared loading, folds, metrics, baseline
 src/example_model.py       template - copy to src/models/<your_model>.py
 src/models/                your model scripts
