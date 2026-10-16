@@ -238,7 +238,7 @@ def run_checks():
     engine.dispose()
     print()
     if failures:
-        print(f"✗ {failures} check(s) failed. See README.md > Troubleshooting.")
+        print(f"✗ {failures} check(s) failed. See sql/README.md > Troubleshooting.")
     else:
         print("✓ All checks passed. sakura_dw is ready.\n"
               "  Model data:  model_features_feb1 / model_features_mar1 (MySQL)\n"
