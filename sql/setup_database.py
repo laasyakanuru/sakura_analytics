@@ -12,7 +12,7 @@ Steps (about 5-15 minutes, mostly loading 2.2 million weather rows):
   3. src/etl/load_daily_weather.py        fact_daily_weather (2,216,378 rows)
   4. src/etl/load_bloom_season.py         fact_bloom_season  (5,986 rows)
   5. sql/03_olap_queries.sql              vw_sakura_march1_features view
-  6. sql/05_model_feature_tables.sql      ref_cv_split + model_features_feb1/mar1
+  6. sql/05_model_feature_tables.sql      ref_cv_split + model_features_feb1/mar1/mar15
   7. export data/model/*.csv              copies for teammates without MySQL
   8. health checks (02 + 04 + leakage/split checks) with a PASS/FAIL table
 
@@ -127,7 +127,8 @@ def database_state():
 def build_model_layer(n_tables, n_csv):
     step(f"{n_tables}  Build model tables (sql/05_model_feature_tables.sql)")
     run_sql_file(SQL_DIR / "05_model_feature_tables.sql")
-    print("Created ref_cv_split, model_features_feb1, model_features_mar1.")
+    print("Created ref_cv_split, model_features_feb1, model_features_mar1, "
+          "model_features_mar15.")
     step(f"{n_csv}  Export CSV copies (data/model/)")
     export_csvs()
 
@@ -193,11 +194,22 @@ CHECKS = [
      "AND bloom_year IN (2013, 2014)) FROM ref_cv_split", 51),
     ("model_features_feb1 rows", "SELECT COUNT(*) FROM model_features_feb1", 4365),
     ("model_features_mar1 rows", "SELECT COUNT(*) FROM model_features_mar1", 4365),
+    ("model_features_mar15 rows", "SELECT COUNT(*) FROM model_features_mar15", 4365),
     ("feature rows before 1964 or non-Somei",
      "SELECT COUNT(*) FROM model_features_mar1 m JOIN dim_station s ON s.station_id = m.station_id "
      "WHERE m.bloom_year < 1964 OR s.cherry_species <> 'Somei-yoshino'", 0),
     ("full bloom on/before Mar 1 (target already known)",
      "SELECT COUNT(*) FROM model_features_mar1 WHERE full_bloom_doy <= 59", 0),
+    ("full bloom on/before Mar 14 (target already known)",
+     "SELECT COUNT(*) FROM model_features_mar15 "
+     "WHERE full_bloom_date <= MAKEDATE(bloom_year, 1) + INTERVAL 2 MONTH + INTERVAL 13 DAY", 0),
+    ("Mar 15 rows not in the Mar 1 table",
+     "SELECT COUNT(*) FROM model_features_mar15 m LEFT JOIN model_features_mar1 o "
+     "ON o.station_id = m.station_id AND o.bloom_year = m.bloom_year WHERE o.station_id IS NULL", 0),
+    ("Mar 15 Feb-mean equals Mar 1 table",
+     "SELECT COUNT(*) FROM model_features_mar15 m JOIN model_features_mar1 o "
+     "ON o.station_id = m.station_id AND o.bloom_year = m.bloom_year "
+     "WHERE m.tmean_feb <> o.tmean_feb OR m.cum_tmax_feb <> o.cum_tmax_feb", 0),
     ("Mar 1 Feb-mean equals stored tmean_feb",
      "SELECT COUNT(*) FROM model_features_mar1 m JOIN fact_bloom_season b "
      "ON b.station_id = m.station_id AND b.season_key = m.bloom_year "
@@ -221,7 +233,7 @@ def run_checks():
             failures += not ok
             print(f"  {'PASS' if ok else 'FAIL'}  {desc:<48} {shown:>12}  (expected {expected:,})")
         # every column except the fold labels must be filled in both model tables
-        for table in ("model_features_feb1", "model_features_mar1"):
+        for table in ("model_features_feb1", "model_features_mar1", "model_features_mar15"):
             desc = f"NULL values in {table}"
             try:
                 cols = [r[0] for r in conn.execute(text(
@@ -241,7 +253,7 @@ def run_checks():
         print(f"✗ {failures} check(s) failed. See sql/README.md > Troubleshooting.")
     else:
         print("✓ All checks passed. sakura_dw is ready.\n"
-              "  Model data:  model_features_feb1 / model_features_mar1 (MySQL)\n"
+              "  Model data:  model_features_feb1 / _mar1 / _mar15 (MySQL)\n"
               "               data/model/*.csv (same tables for Python-only use)")
     return failures
 
