@@ -42,6 +42,7 @@ Model layer (derived from the star schema by `05`, rebuilt at any time):
 | `ref_cv_split` | one row per bloom year 1964–2025: `split`, `fold1`–`fold5` |
 | `model_features_feb1` | Feb 1 feature table ([columns](../README.md#27-what-is-in-the-feature-tables)) |
 | `model_features_mar1` | Mar 1 feature table ([columns](../README.md#27-what-is-in-the-feature-tables)) |
+| `model_features_mar15` | Mar 15 feature table: all Mar 1 columns + 1–14 March ([columns](../README.md#27-what-is-in-the-feature-tables)) |
 
 ---
 
@@ -102,7 +103,7 @@ git-ignored — never commit it.
 | `02_validation.sql` | Row counts, coverage, missing targets, duplicate keys, foreign keys. | No |
 | `03_olap_queries.sql` | Descriptive OLAP queries (bloom timing by region, decade, earliest stations, January temperature, imputation by region) and the `vw_sakura_march1_features` view. | Creates a view |
 | `04_season_integration_validation.sql` | Season mapping, grain and feature-consistency checks ([section 4](#4-what-04-checks)). | No |
-| `05_model_feature_tables.sql` | Builds the model layer with explicit forecast-date cutoffs. Safe to re-run. | Rebuilds 3 model tables |
+| `05_model_feature_tables.sql` | Builds the model layer with explicit forecast-date cutoffs. Safe to re-run. | Rebuilds 4 model tables |
 
 To run one file by hand in Workbench: File → Open SQL Script → ⚡ Execute.
 For `04`, raise the result-row limit first (B1 lists ~26,000 rows).
@@ -170,7 +171,8 @@ From a fresh build on MySQL 8.0 (2026-10-16):
   0 MISMATCH; A2 — precipitation 5,944 MATCH / 42 MISSING, sunshine 5,376 MATCH
   / 610 MISSING, 0 MISMATCH; B2, B3, C2 return no rows.
 - Model tables: 4,365 rows each (3,837 development, 528 test); no empty
-  values; no full bloom on or before Mar 1 (earliest is day 78).
+  values; no full bloom on or before Mar 1, or Mar 14 for `model_features_mar15`
+  (earliest is day 78).
 - Climatology baseline, mean of 5 validation folds: MAE 3.96, RMSE 4.69,
   R² 0.80, ±3-day hit rate 0.44.
 
