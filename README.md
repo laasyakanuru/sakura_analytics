@@ -1,7 +1,7 @@
 # Sakura Yosoku — Cherry Blossom Full-Bloom Forecasting
 
 Predict the Somei-yoshino full-bloom date (day of year) for 82 JMA stations at
-two forecast dates, **Feb 1** and **Mar 1**, from daily weather 1952–2025.
+three forecast dates, **Feb 1**, **Mar 1** and **Mar 15**, from daily weather 1952–2025.
 
 - **Building models?** Read this page (Python only, no MySQL needed).
 - **MySQL warehouse, star schema, SQL files:** see [`sql/README.md`](sql/README.md)
@@ -57,7 +57,7 @@ git pull
 python3 src/example_model.py
 ```
 
-It loads the data, trains a linear regression on the 5 agreed folds for both
+It loads the data, trains a linear regression on the 5 agreed folds for all three
 forecast dates, prints the scores next to the climatology baseline, and saves
 them under `results/`. If this works, your setup is complete.
 
@@ -85,7 +85,7 @@ Then run it:
 python3 src/models/gradient_boosting.py
 ```
 
-Output, for `feb1` and `mar1`:
+Output, for `feb1`, `mar1` and `mar15`:
 
 ```
 === gradient_boosting | forecast date mar1 | 23 features ===
@@ -120,7 +120,7 @@ import sys; sys.path.append("src")      # path to the src folder from where you 
 from model_data import (load_features, feature_columns, cv_folds, evaluate,
                         cv_report, climatology_baseline, TARGET)
 
-df = load_features("mar1")              # or "feb1"
+df = load_features("mar1")              # or "feb1" / "mar15"
 X = feature_columns(df)                 # all candidate features
 
 for fold, train, valid in cv_folds(df):
@@ -130,7 +130,7 @@ for fold, train, valid in cv_folds(df):
 
 | Function | Returns |
 |---|---|
-| `load_features(date)` | the feature table for `"feb1"` or `"mar1"` (add `source="csv"` or `"mysql"` to force one) |
+| `load_features(date)` | the feature table for `"feb1"`, `"mar1"` or `"mar15"` (add `source="csv"` or `"mysql"` to force one) |
 | `feature_columns(df)` | all candidate feature names |
 | `cv_folds(df)` | `(fold, train_df, valid_df)` for the 5 agreed folds |
 | `evaluate(y_true, y_pred)` | `{n, MAE, RMSE, R2, hit_rate_3d}` |
@@ -144,22 +144,30 @@ One row per station and bloom year: Somei-yoshino only, bloom years 1964–2025,
 observed full-bloom date, no missing temperature day up to the cutoff
 (4,365 rows in each table).
 
-| Column group | `feb1` (weather to 31 Jan) | `mar1` (weather to 28/29 Feb) |
-|---|---|---|
-| Station | `latitude`, `longitude`, `elevation_m`, `relocations_before_season` | same |
-| Monthly mean temperature | `tmean_oct` … `tmean_jan` | `tmean_oct` … `tmean_feb` |
-| Monthly max / min | `tmax_jan`, `tmin_jan` | `tmax_jan`, `tmin_jan`, `tmax_feb`, `tmin_feb` |
-| Chilling | `chill_days_0_7c_nov_jan`, `tmin_lowest_nov_jan` | `chill_days_0_7c_nov_feb`, `tmin_lowest_nov_feb` |
-| Frost days (Tmin < 0) | `frost_days_jan` | `frost_days_jan_feb` |
-| Warmth in the last month | `gdd5_jan`, `cum_tmax_jan`, `cum_tmean_jan` | `gdd5_feb`, `cum_tmax_feb`, `cum_tmean_feb` |
-| Precipitation / sunshine | `precip_jan_mm`, `sunshine_jan_h` (+ `_missing_days`) | `precip_feb_mm`, `sunshine_feb_h` (+ `_missing_days`) |
-| Not features | `station_id`, `location`, `prefecture`, `region`, `bloom_year`, `full_bloom_date`, **`full_bloom_doy` (target)**, `split`, `fold1`–`fold5` | same |
+| Column group | `feb1` (weather to 31 Jan) | `mar1` (weather to 28/29 Feb) | `mar15` (weather to 14 Mar): all `mar1` columns, plus |
+|---|---|---|---|
+| Station | `latitude`, `longitude`, `elevation_m`, `relocations_before_season` | same | – |
+| Monthly mean temperature | `tmean_oct` … `tmean_jan` | `tmean_oct` … `tmean_feb` | `tmean_mar1_14` |
+| Monthly max / min | `tmax_jan`, `tmin_jan` | `tmax_jan`, `tmin_jan`, `tmax_feb`, `tmin_feb` | `tmax_mar1_14`, `tmin_mar1_14` |
+| Chilling | `chill_days_0_7c_nov_jan`, `tmin_lowest_nov_jan` | `chill_days_0_7c_nov_feb`, `tmin_lowest_nov_feb` | `chill_days_0_7c_mar1_14` |
+| Frost days (Tmin < 0) | `frost_days_jan` | `frost_days_jan_feb` | `frost_days_mar1_14` |
+| Warmth in the last month | `gdd5_jan`, `cum_tmax_jan`, `cum_tmean_jan` | `gdd5_feb`, `cum_tmax_feb`, `cum_tmean_feb` | `gdd5_mar1_14`, `cum_tmax_mar1_14`, `cum_tmean_mar1_14`, `cum_tmax_feb1_mar14` |
+| Precipitation / sunshine | `precip_jan_mm`, `sunshine_jan_h` (+ `_missing_days`) | `precip_feb_mm`, `sunshine_feb_h` (+ `_missing_days`) | `precip_mar1_14_mm`, `sunshine_mar1_14_h` (+ `_missing_days`) |
+| Not features | `station_id`, `location`, `prefecture`, `region`, `bloom_year`, `full_bloom_date`, **`full_bloom_doy` (target)**, `split`, `fold1`–`fold5` | same | – |
 
 Definitions: chill day = daily mean 0–7.2 °C; `gdd5` = sum of max(Tmean − 5, 0);
 `cum_*` = sum of daily values over the month. Precipitation and sunshine
 totals are (mean of observed days) × (days in month); `*_missing_days` says
 how many days were estimated. One month with no sunshine data at all
-(station 604, Feb 2008) uses the same-year mean of its region.
+(station 604, Feb 2008; in `mar15` also 1–14 Mar 2008) uses the same-year mean
+of its region.
+
+`mar15` contains every `mar1` column with identical values (same rows: all
+4,365 also have complete temperatures to 14 Mar), plus the same quantities for
+1–14 March (`*_mar1_14`; totals = mean of observed days × 14) and
+`cum_tmax_feb1_mar14` = daily maximum temperature summed from 1 Feb to 14 Mar.
+The earliest full bloom in the data is day 78, so every Mar 15 row is still a
+forecast.
 No column contains empty values.
 
 `feature_columns(df)` returns everything except the "Not features" row.
@@ -189,7 +197,8 @@ These come from the Model Development Meeting and keep the models comparable.
 3. **Same metrics**: `evaluate()` — MAE, RMSE, R², and the ±3-day hit rate
    (share of point predictions within 3 days of the actual full bloom; not a
    prediction interval).
-4. **Both forecast dates**: report `feb1` and `mar1` (the example does both).
+4. **All three forecast dates**: report `feb1`, `mar1` and `mar15` (the example
+   does all three). Mar 15 was added after the meeting by team agreement.
 5. **Test years 2015–2025 stay untouched** until the team has chosen the
    champion per forecast date on validation. Then set `RUN_FINAL_TEST = True`
    for the champions only.
@@ -213,7 +222,7 @@ test set covers those 48 stations.
 README.md                  this file (modelling)
 requirements.txt           Python packages
 config.json                file paths used by the data-preparation scripts
-data/model/                model_features_feb1.csv, model_features_mar1.csv
+data/model/                model_features_feb1.csv, _mar1.csv, _mar15.csv
 data/processed/, data/raw/ source and cleaned data
 sql/                       MySQL warehouse: 01-05 SQL files, setup_database.py,
                            star_schema/ (ERD) - see sql/README.md

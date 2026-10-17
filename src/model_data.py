@@ -6,7 +6,7 @@ team uses identical rows, folds and metrics:
     import sys; sys.path.append("src")          # from the project root
     from model_data import load_features, feature_columns, cv_folds, evaluate
 
-    df = load_features("mar1")                  # or "feb1"
+    df = load_features("mar1")                  # or "feb1" / "mar15"
     X = feature_columns(df)
     for fold, train, valid in cv_folds(df):
         model.fit(train[X], train[TARGET])
@@ -30,7 +30,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src" / "etl"))
 from db_connection import credentials_configured, get_engine  # noqa: E402
 
 CSV_DIR = PROJECT_ROOT / "data" / "model"
-FORECAST_TABLES = {"feb1": "model_features_feb1", "mar1": "model_features_mar1"}
+FORECAST_TABLES = {"feb1": "model_features_feb1", "mar1": "model_features_mar1",
+                   "mar15": "model_features_mar15"}
 
 TARGET = "full_bloom_doy"
 FOLD_COLUMNS = ["fold1", "fold2", "fold3", "fold4", "fold5"]
@@ -77,7 +78,7 @@ def _from_csv(forecast_date):
 
 
 def load_features(forecast_date="mar1", source="auto", verbose=True):
-    """Leakage-safe feature table for one forecast date ('feb1' or 'mar1').
+    """Leakage-safe feature table for one forecast date ('feb1', 'mar1' or 'mar15').
 
     source: "auto" (MySQL if configured and reachable, else CSV), "mysql" or "csv".
     Rows: Somei-yoshino, bloom year >= 1964, observed full bloom, no missing

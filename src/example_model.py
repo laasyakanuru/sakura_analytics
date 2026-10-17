@@ -4,7 +4,7 @@
     # edit MODEL_NAME, make_model() and (optionally) choose_features()
     python3 src/models/gradient_boosting.py
 
-What it does, for BOTH forecast dates (Feb 1 and Mar 1):
+What it does, for ALL THREE forecast dates (Feb 1, Mar 1 and Mar 15):
   1. loads the agreed leakage-safe feature table (MySQL or data/model/ CSV);
   2. trains on each of the 5 agreed CV folds and scores the validation years
      with MAE / RMSE / R2 / +-3-day hit rate;
@@ -60,7 +60,7 @@ def main():
     results_dir = PROJECT_ROOT / "results"
     results_dir.mkdir(exist_ok=True)
 
-    for forecast_date in ("feb1", "mar1"):
+    for forecast_date in ("feb1", "mar1", "mar15"):
         df = load_features(forecast_date)
         features = choose_features(df)
 
