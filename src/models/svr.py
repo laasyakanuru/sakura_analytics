@@ -1,15 +1,15 @@
-"""Support Vector Regression (SVR) model - Laasya.
+"""Support Vector Regression (SVR) model 
 
-    python3 src/models/svr/svr_model.py                    # tune + report both dates
-    python3 src/models/svr/svr_model.py --no-tune          # skip tuning, use DEFAULT_PARAMS
-    python3 src/models/svr/svr_model.py --target raw       # comparison: predict the raw DOY
-    python3 src/models/svr/svr_model.py --train-window 30  # comparison: last 30 years only
+    python3 src/models/svr.py                    # tune + report both dates
+    python3 src/models/svr.py --no-tune          # skip tuning, use DEFAULT_PARAMS
+    python3 src/models/svr.py --target raw       # comparison: predict the raw DOY
+    python3 src/models/svr.py --train-window 30  # comparison: last 30 years only
 
   * data      : load_features() only (leakage-safe feb1 / mar1 tables)
   * folds     : the 5 agreed expanding-window folds from cv_folds()
                 (train 1964..T, validate the next two years; T = 2004 ... 2012)
   * metrics   : evaluate() -> MAE, RMSE, R2, +-3-day hit rate
-  * dates     : feb1 AND mar1
+  * dates     : feb1, mar1 AND mar15 (Mar 15 added by team agreement)
   * test      : 2015-2025 stays untouched unless RUN_FINAL_TEST = True
                 (champion model only, after the team picks it on validation)
   * scaling   : StandardScaler inside the model, fitted on the training fold only
@@ -39,7 +39,7 @@ the SAME 5 validation folds (GridSearchCV with refit=False, so it never trains
 outside the fold training windows). The best mean-MAE setting is reported with
 cv_report() like every other model, so the `mean` row is directly comparable.
 
-Outputs (in outputs/svr/; prefix "svr", plus "_raw" / "_train<N>" for the
+Outputs (in results/svr/; prefix "svr", plus "_raw" / "_train<N>" for the
 comparison options):
   <prefix>_<date>_cv.csv       fold table + mean row (commit this for the comparison)
   <prefix>_<date>_tuning.csv   every grid setting with its mean/std validation MAE
@@ -68,7 +68,7 @@ from model_data import (TARGET, cv_folds, cv_report,  # noqa: E402
 # ============================ change these ==================================
 MODEL_NAME = "svr"
 RUN_FINAL_TEST = False          # champion model only!
-FORECAST_DATES = ("feb1", "mar1")
+FORECAST_DATES = ("feb1", "mar1", "mar15")
 TARGET_MODE = "anomaly"         # "anomaly" (default) or "raw"
 STATION_REF_YEARS = 30          # years in the station reference (anomaly target)
 MIN_STATION_HISTORY = 10        # fewer years -> region mean, then overall mean
@@ -266,8 +266,8 @@ def run_name():
 
 
 def run(forecast_date, do_tune, results_dir, df=None):
-    """Tune, report and save one forecast date. `df` lets other scripts (e.g.
-    mar15_poc.py) pass their own feature table; default: load_features()."""
+    """Tune, report and save one forecast date. `df` lets another script pass
+    its own feature table; default: load_features(forecast_date)."""
     name = run_name()
     df = load_features(forecast_date) if df is None else df
     features = choose_features(df)
@@ -340,7 +340,7 @@ def main():
     TARGET_MODE = args.target
     TRAIN_WINDOW_YEARS = args.train_window
 
-    results_dir = PROJECT_ROOT / "outputs" / "svr"
+    results_dir = PROJECT_ROOT / "results" / "svr"
     results_dir.mkdir(parents=True, exist_ok=True)
     for forecast_date in FORECAST_DATES:
         run(forecast_date, not args.no_tune, results_dir)
