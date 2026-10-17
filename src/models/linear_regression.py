@@ -1,14 +1,12 @@
-"""Compare Lasso-selected OLS by forecast date and sample scope.
+"""Compare all-variable OLS, all-variable Lasso and Lasso-selected OLS.
 
-Run from the repository root:
-    python3 src/models/linear_regression.py
-
-February and March select variables separately. In both cases, Lasso alpha
-and variables are fixed once using the same full-sample 1964-2004 data. The
-fixed variables are then used in the repository's five CV folds for full and
-small samples. Full models use full validation rows; small models use stations
-with a 2025 observation. Both climatology baselines use the matching train and
-validation rows. The script writes only results/linear_regression_cv.csv.
+Run from the repository root: python3 src/models/linear_regression.py
+Forecast dates: Feb 1, Mar 1 and Mar 15. Candidate features retain the original
+lists, extended with Mar 1-14 weather for Mar 15. For each date, Lasso alpha
+and selection are fixed on full-sample 1964-2004 data with internal expanding
+CV. The same alpha is used for direct Lasso in all five outer folds/scopes.
+Full/small sample definitions and both climatology baselines are unchanged.
+Writes three CSVs in results/, each with five folds and a mean row per group.
 """
 import sys
 import warnings
@@ -26,6 +24,9 @@ PROJECT_ROOT = next((p for p in Path(__file__).resolve().parents
 if PROJECT_ROOT is None:
     raise SystemExit("Place this file in sakura_analytics/src/models/.")
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+import model_data  # noqa: E402
+# Compatibility with older model_data.py versions; the Mar 15 CSV is required.
+model_data.FORECAST_TABLES.setdefault("mar15", "model_features_mar15")
 from model_data import (TARGET, climatology_baseline, cv_folds, evaluate,
                         load_features)  # noqa: E402
 
@@ -41,7 +42,16 @@ FEATURES = {
         "cum_tmax_feb", "cum_tmean_feb",
     ],
 }
-LABELS = {"feb1": "February 1", "mar1": "March 1"}
+FEATURES["mar15"] = FEATURES["mar1"] + [
+    "tmean_mar1_14", "tmax_mar1_14", "tmin_mar1_14", "gdd5_mar1_14",
+    "cum_tmax_mar1_14", "cum_tmean_mar1_14", "chill_days_0_7c_mar1_14",
+    "frost_days_mar1_14", "precip_mar1_14_mm", "sunshine_mar1_14_h",
+    "cum_tmax_feb1_mar14",
+]
+LABELS = {"feb1": "February 1", "mar1": "March 1", "mar15": "March 15"}
+OUTPUTS = {"ols_all": "linear_regression_ols_all_cv.csv",
+           "lasso_all": "linear_regression_lasso_all_cv.csv",
+           "lasso_selected_ols": "linear_regression_lasso_selected_ols_cv.csv"}
 SCOPES = ("Full sample", "Small sample")
 ALPHAS = np.logspace(-4, 2, 40)
 METRICS = ("MAE_days", "RMSE_days", "R2", "Bias_days",
@@ -94,7 +104,7 @@ def select_features(data, features):
         for train, valid in selection_folds(selection):
             model = make_pipeline(
                 StandardScaler(),
-                Lasso(alpha=float(alpha), max_iter=100000, tol=1e-5),
+                Lasso(alpha=float(alpha), max_iter=100000, tol=1e-5, precompute=True),
             )
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always", ConvergenceWarning)
@@ -109,7 +119,7 @@ def select_features(data, features):
         raise ValueError("No Lasso alpha converged in every selection fold.")
     alpha = min(eligible, key=lambda value: (errors[value], value))
     selector = make_pipeline(
-        StandardScaler(), Lasso(alpha=alpha, max_iter=100000, tol=1e-5))
+        StandardScaler(), Lasso(alpha=alpha, max_iter=100000, tol=1e-5, precompute=True))
     with warnings.catch_warnings():
         warnings.simplefilter("error", ConvergenceWarning)
         selector.fit(selection[features], selection[TARGET])
@@ -152,7 +162,7 @@ def main():
     if not len(stations):
         raise ValueError("No stations observed in 2025 for small sample.")
 
-    rows = []
+    rows = {method: [] for method in OUTPUTS}
     for date, data in datasets.items():
         features = FEATURES[date]
         development = data.loc[data["split"].eq("development")].copy()
@@ -169,8 +179,8 @@ def main():
                         full_train["station_id"].astype(str).isin(stations)]
                     valid = full_valid.loc[
                         full_valid["station_id"].astype(str).isin(stations)]
-                model = make_pipeline(StandardScaler(), LinearRegression())
-                model.fit(train[selected], train[TARGET])
+                if train.empty or valid.empty:
+                    raise ValueError(f"Empty fold: {date}, {scope}, {fold}")
                 row = {
                     "Forecast": LABELS[date], "Sample": scope, "fold": fold,
                     "Train_years": f"{train.bloom_year.min()}-{train.bloom_year.max()}",
@@ -183,30 +193,49 @@ def main():
                     "Selected_feature_count": len(selected),
                     "Selected_features": "|".join(selected),
                 }
-                add_metrics(row, "Model", valid[TARGET],
-                            model.predict(valid[selected]))
+                # Baselines use exactly the same rows for all three methods.
                 add_metrics(row, "All_history", valid[TARGET],
                             climatology_baseline(train, valid))
                 add_metrics(row, "Climatology_30yr", valid[TARGET],
                             climatology_30yr(train, valid))
-                rows.append(row)
+                for method in OUTPUTS:
+                    used = selected if method == "lasso_selected_ols" else features
+                    estimator = (Lasso(alpha=alpha, max_iter=100000, tol=1e-5, precompute=True)
+                                 if method == "lasso_all" else LinearRegression())
+                    model = make_pipeline(StandardScaler(), estimator)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("error", ConvergenceWarning)
+                        model.fit(train[used], train[TARGET])
+                    result = row.copy()
+                    if method == "ols_all":
+                        # No Lasso tuning or feature selection is applied to OLS-all.
+                        result.update(Selection_train_years="", Selection_N=np.nan,
+                                      Selection_stations=np.nan, Selection_alpha=np.nan)
+                    result["Selected_feature_count"] = len(used)
+                    result["Selected_features"] = "|".join(used)
+                    add_metrics(result, "Model", valid[TARGET],
+                                model.predict(valid[used]))
+                    rows[method].append(result)
 
-    detail = pd.DataFrame(rows)
-    parts = []
-    for _, group in detail.groupby(["Forecast", "Sample"], sort=False):
-        parts.extend([group, pd.DataFrame([make_mean(group)])])
-    report = pd.concat(parts, ignore_index=True)
     output = PROJECT_ROOT / "results"
     output.mkdir(exist_ok=True)
-    path = output / "linear_regression_cv.csv"
-    report.to_csv(path, index=False, float_format="%.10g")
-
-    summary = report.loc[report["fold"].astype(str).eq("mean"), [
-        "Forecast", "Sample", "N", "Model_MAE_days",
-        "All_history_MAE_days", "Climatology_30yr_MAE_days"]]
-    print("\nFive-fold mean MAE")
-    print(summary.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
-    print(f"Saved {path}")
+    for method, filename in OUTPUTS.items():
+        detail = pd.DataFrame(rows[method])
+        parts = []
+        for _, group in detail.groupby(["Forecast", "Sample"], sort=False):
+            mean = make_mean(group)
+            if method == "ols_all":
+                mean["Selection_train_years"] = ""
+            parts.extend([group, pd.DataFrame([mean])])
+        report = pd.concat(parts, ignore_index=True)
+        path = output / filename
+        report.to_csv(path, index=False, float_format="%.10g")
+        summary = report.loc[report["fold"].astype(str).eq("mean"), [
+            "Forecast", "Sample", "N", "Model_MAE_days",
+            "All_history_MAE_days", "Climatology_30yr_MAE_days"]]
+        print(f"\n{method}: five-fold mean MAE")
+        print(summary.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        print(f"Saved {path}")
 
 
 if __name__ == "__main__":
