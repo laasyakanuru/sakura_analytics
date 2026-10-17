@@ -1,2 +1,0 @@
-Forecast,Training sample,Model,Selection_alpha,Train_N,Train_stations,Train_year_start,Train_year_end,Feature_count,Original_unit_intercept,Selected_features,N,MAE_days,RMSE_days,R2,Bias_days,Within_3_days_pct
-March 1,Small sample,OLS after full-sample Lasso selection,0.170125428,2444,48,1964,2014,8,80.78430214,latitude|tmean_oct|tmean_feb|tmax_feb|tmin_feb|chill_days_0_7c_nov_feb|tmin_lowest_nov_feb|gdd5_feb,528,5.06582424,6.352062724,0.4738252257,3.331692626,36.17424242
