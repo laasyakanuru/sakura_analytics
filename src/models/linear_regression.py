@@ -1,12 +1,15 @@
-"""Compare all-variable OLS, all-variable Lasso and Lasso-selected OLS.
+"""Compare raw DOY and station-anomaly targets in three CV reports.
 
-Run from the repository root: python3 src/models/linear_regression.py
-Forecast dates: Feb 1, Mar 1 and Mar 15. Candidate features retain the original
-lists, extended with Mar 1-14 weather for Mar 15. For each date, Lasso alpha
-and selection are fixed on full-sample 1964-2004 data with internal expanding
-CV. The same alpha is used for direct Lasso in all five outer folds/scopes.
-Full/small sample definitions and both climatology baselines are unchanged.
-Writes three CSVs in results/, each with five folds and a mean row per group.
+Run: python3 src/models/linear_regression.py
+Dates, candidate feature lists, full/small samples, baselines and outer folds
+are unchanged. Each report pairs raw/anomaly metrics on identical rows.
+Lasso alpha and selected variables are determined separately for each target
+using full-sample 1964-2004 and its original five internal selection folds.
+Anomaly references are fixed per station per fit: last 30 calendar years of
+that fit's training data, with station (<10 records) -> region -> overall
+fallback. All training years remain; predictions are restored to DOY before
+scoring. References are rebuilt inside each inner and outer fit.
+Only the three existing CV filenames are written in results/.
 """
 import sys
 import warnings
@@ -94,7 +97,31 @@ def selection_folds(data):
     return folds
 
 
-def select_features(data, features):
+TARGET_MODES = ("raw", "anomaly")
+
+def station_reference(train, rows):
+    """SVR-compatible reference, fixed within a training fit (not rolling by row)."""
+    last = int(train["bloom_year"].max())
+    hist = train.loc[train["bloom_year"].between(last - 29, last)]
+    station = hist.groupby("station_id")[TARGET].agg(["mean", "size"])
+    region = hist.groupby("region")[TARGET].mean()
+    overall = hist[TARGET].mean()
+    mean = rows["station_id"].map(station["mean"])
+    size = rows["station_id"].map(station["size"]).fillna(0)
+    fallback = rows["region"].map(region).fillna(overall)
+    return np.where(size >= 10, mean, fallback).astype(float)
+
+
+def model_target(train, valid, target_mode):
+    if target_mode == "raw":
+        return train[TARGET].to_numpy(dtype=float), np.zeros(len(valid))
+    if target_mode != "anomaly":
+        raise ValueError(f"Unknown target mode: {target_mode}")
+    return (train[TARGET].to_numpy(dtype=float) - station_reference(train, train),
+            station_reference(train, valid))
+
+
+def select_features(data, features, target_mode):
     selection = data.loc[data["bloom_year"].between(1964, 2004)]
     if selection.empty or int(selection["bloom_year"].max()) != 2004:
         raise ValueError("Lasso selection requires full-sample 1964-2004 data.")
@@ -108,11 +135,12 @@ def select_features(data, features):
             )
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always", ConvergenceWarning)
-                model.fit(train[features], train[TARGET])
+                fit_y, restore = model_target(train, valid, target_mode)
+                model.fit(train[features], fit_y)
             ok &= not any(issubclass(w.category, ConvergenceWarning)
                           for w in caught)
             fold_errors.append(evaluate(
-                valid[TARGET], model.predict(valid[features]))["MAE"])
+                valid[TARGET], model.predict(valid[features]) + restore)["MAE"])
         errors[float(alpha)], converged[float(alpha)] = np.mean(fold_errors), ok
     eligible = [alpha for alpha in errors if converged[alpha]]
     if not eligible:
@@ -122,7 +150,8 @@ def select_features(data, features):
         StandardScaler(), Lasso(alpha=alpha, max_iter=100000, tol=1e-5, precompute=True))
     with warnings.catch_warnings():
         warnings.simplefilter("error", ConvergenceWarning)
-        selector.fit(selection[features], selection[TARGET])
+        fit_y, _ = model_target(selection, selection, target_mode)
+        selector.fit(selection[features], fit_y)
     selected = [name for name, coefficient
                 in zip(features, selector[-1].coef_) if coefficient != 0]
     if not selected:
@@ -136,20 +165,14 @@ def add_metrics(row, prefix, actual, predicted):
 
 
 def make_mean(group):
-    row = {"Forecast": group.iloc[0]["Forecast"],
-           "Sample": group.iloc[0]["Sample"], "fold": "mean",
-           "Train_years": "", "Validation_years": "",
-           "Train_N": np.nan, "N": int(group["N"].sum()),
-           "Selection_train_years": "1964-2004",
-           "Selection_N": group.iloc[0]["Selection_N"],
-           "Selection_stations": group.iloc[0]["Selection_stations"],
-           "Selection_alpha": group.iloc[0]["Selection_alpha"],
-           "Selected_feature_count": group.iloc[0]["Selected_feature_count"],
-           "Selected_features": group.iloc[0]["Selected_features"]}
-    for prefix in ("Model", "All_history", "Climatology_30yr"):
+    # Unweighted mean over the five folds, preserving the original convention.
+    row = group.iloc[0].to_dict()
+    row.update(fold="mean", Train_years="", Validation_years="",
+               Train_N=np.nan, N=int(group["N"].sum()))
+    for prefix in (*TARGET_MODES, "All_history", "Climatology_30yr"):
         for metric in METRICS:
-            column = f"{prefix}_{metric}"
-            row[column] = float(group[column].mean())
+            col = f"{prefix}_{metric}"
+            row[col] = float(group[col].mean())
     return row
 
 
@@ -161,62 +184,57 @@ def main():
         & datasets["mar1"][TARGET].notna(), "station_id"].astype(str).unique()
     if not len(stations):
         raise ValueError("No stations observed in 2025 for small sample.")
-
     rows = {method: [] for method in OUTPUTS}
     for date, data in datasets.items():
         features = FEATURES[date]
         development = data.loc[data["split"].eq("development")].copy()
-        alpha, selected, selection_n, selection_stations = select_features(
-            development, features)
-        print(f"{LABELS[date]} selected: {', '.join(selected)}", flush=True)
-
+        selections = {}
+        for mode in TARGET_MODES:
+            selections[mode] = select_features(development, features, mode)
+            print(f"{LABELS[date]} | {mode} selected: "
+                  + ", ".join(selections[mode][1]), flush=True)
         for fold, full_train, full_valid in cv_folds(development):
             for scope in SCOPES:
                 if scope == "Full sample":
                     train, valid = full_train, full_valid
                 else:
-                    train = full_train.loc[
-                        full_train["station_id"].astype(str).isin(stations)]
-                    valid = full_valid.loc[
-                        full_valid["station_id"].astype(str).isin(stations)]
+                    train = full_train.loc[full_train["station_id"].astype(str).isin(stations)]
+                    valid = full_valid.loc[full_valid["station_id"].astype(str).isin(stations)]
                 if train.empty or valid.empty:
                     raise ValueError(f"Empty fold: {date}, {scope}, {fold}")
-                row = {
+                base = {
                     "Forecast": LABELS[date], "Sample": scope, "fold": fold,
                     "Train_years": f"{train.bloom_year.min()}-{train.bloom_year.max()}",
                     "Validation_years": f"{valid.bloom_year.min()}-{valid.bloom_year.max()}",
                     "Train_N": len(train), "N": len(valid),
-                    "Selection_train_years": "1964-2004",
-                    "Selection_N": selection_n,
-                    "Selection_stations": selection_stations,
-                    "Selection_alpha": alpha,
-                    "Selected_feature_count": len(selected),
-                    "Selected_features": "|".join(selected),
+                    "Anomaly_reference_years":
+                        f"{int(train.bloom_year.max()) - 29}-{int(train.bloom_year.max())}",
                 }
-                # Baselines use exactly the same rows for all three methods.
-                add_metrics(row, "All_history", valid[TARGET],
-                            climatology_baseline(train, valid))
-                add_metrics(row, "Climatology_30yr", valid[TARGET],
-                            climatology_30yr(train, valid))
+                # Both targets use exactly the same training/validation records.
+                add_metrics(base, "All_history", valid[TARGET], climatology_baseline(train, valid))
+                add_metrics(base, "Climatology_30yr", valid[TARGET], climatology_30yr(train, valid))
                 for method in OUTPUTS:
-                    used = selected if method == "lasso_selected_ols" else features
-                    estimator = (Lasso(alpha=alpha, max_iter=100000, tol=1e-5, precompute=True)
-                                 if method == "lasso_all" else LinearRegression())
-                    model = make_pipeline(StandardScaler(), estimator)
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("error", ConvergenceWarning)
-                        model.fit(train[used], train[TARGET])
-                    result = row.copy()
-                    if method == "ols_all":
-                        # No Lasso tuning or feature selection is applied to OLS-all.
-                        result.update(Selection_train_years="", Selection_N=np.nan,
-                                      Selection_stations=np.nan, Selection_alpha=np.nan)
-                    result["Selected_feature_count"] = len(used)
-                    result["Selected_features"] = "|".join(used)
-                    add_metrics(result, "Model", valid[TARGET],
-                                model.predict(valid[used]))
+                    result = base.copy()
+                    for mode in TARGET_MODES:
+                        alpha, selected, selection_n, selection_stations = selections[mode]
+                        used = selected if method == "lasso_selected_ols" else features
+                        estimator = (Lasso(alpha=alpha, max_iter=100000, tol=1e-5, precompute=True)
+                                     if method == "lasso_all" else LinearRegression())
+                        model = make_pipeline(StandardScaler(), estimator)
+                        fit_y, restore = model_target(train, valid, mode)
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("error", ConvergenceWarning)
+                            model.fit(train[used], fit_y)
+                        result.update({
+                            f"{mode}_Selection_train_years": "" if method == "ols_all" else "1964-2004",
+                            f"{mode}_Selection_N": np.nan if method == "ols_all" else selection_n,
+                            f"{mode}_Selection_stations": np.nan if method == "ols_all" else selection_stations,
+                            f"{mode}_Selection_alpha": np.nan if method == "ols_all" else alpha,
+                            f"{mode}_Selected_feature_count": len(used),
+                            f"{mode}_Selected_features": "|".join(used),
+                        })
+                        add_metrics(result, mode, valid[TARGET], model.predict(valid[used]) + restore)
                     rows[method].append(result)
-
     output = PROJECT_ROOT / "results"
     output.mkdir(exist_ok=True)
     for method, filename in OUTPUTS.items():
@@ -224,17 +242,25 @@ def main():
         parts = []
         for _, group in detail.groupby(["Forecast", "Sample"], sort=False):
             mean = make_mean(group)
-            if method == "ols_all":
-                mean["Selection_train_years"] = ""
+            mean["Anomaly_reference_years"] = "per fold (see detail rows)"
             parts.extend([group, pd.DataFrame([mean])])
         report = pd.concat(parts, ignore_index=True)
+        keys = ["Forecast", "Sample", "fold", "Train_years", "Validation_years", "Train_N", "N"]
+        # Each raw metric is immediately followed by its anomaly counterpart.
+        paired = [f"{mode}_{metric}" for metric in METRICS for mode in TARGET_MODES]
+        baseline = [f"{prefix}_{metric}" for metric in METRICS
+                    for prefix in ("All_history", "Climatology_30yr")]
+        metadata = ["Anomaly_reference_years"] + [
+            f"{mode}_{field}" for field in (
+                "Selection_train_years", "Selection_N", "Selection_stations", "Selection_alpha",
+                "Selected_feature_count", "Selected_features") for mode in TARGET_MODES]
+        report = report[keys + paired + baseline + metadata]
         path = output / filename
         report.to_csv(path, index=False, float_format="%.10g")
-        summary = report.loc[report["fold"].astype(str).eq("mean"), [
-            "Forecast", "Sample", "N", "Model_MAE_days",
-            "All_history_MAE_days", "Climatology_30yr_MAE_days"]]
-        print(f"\n{method}: five-fold mean MAE")
-        print(summary.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+        print(f"\n{method}: five-fold mean MAE (restored DOY)")
+        print(report.loc[report.fold.astype(str).eq("mean"),
+                         ["Forecast", "Sample", "N", "raw_MAE_days", "anomaly_MAE_days",
+                          "All_history_MAE_days", "Climatology_30yr_MAE_days"]].to_string(index=False))
         print(f"Saved {path}")
 
 
