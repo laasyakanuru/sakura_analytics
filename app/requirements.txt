@@ -1,0 +1,6 @@
+# scikit-learn must match the version that saved app/model/svr_mar15.joblib
+streamlit>=1.36
+scikit-learn==1.6.1
+numpy
+pandas
+joblib

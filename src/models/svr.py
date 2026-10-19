@@ -391,7 +391,6 @@ def main():
     TRAIN_WINDOW_YEARS = args.train_window
     SAMPLE = args.sample
     FEATURE_SET = args.features
-
     results_dir = PROJECT_ROOT / "results" / "svr"
     results_dir.mkdir(parents=True, exist_ok=True)
     for forecast_date in FORECAST_DATES:
