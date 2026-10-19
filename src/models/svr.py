@@ -4,6 +4,8 @@
     python3 src/models/svr.py --no-tune          # skip tuning, use DEFAULT_PARAMS
     python3 src/models/svr.py --target raw       # comparison: predict the raw DOY
     python3 src/models/svr.py --train-window 30  # comparison: last 30 years only
+    python3 src/models/svr.py --sample small     # only stations observed in 2025
+    python3 src/models/svr.py --features all     # every column in the feature table
 
   * data      : load_features() only (leakage-safe feb1 / mar1 tables)
   * folds     : the 5 agreed expanding-window folds from cv_folds()
@@ -73,6 +75,8 @@ TARGET_MODE = "anomaly"         # "anomaly" (default) or "raw"
 STATION_REF_YEARS = 30          # years in the station reference (anomaly target)
 MIN_STATION_HISTORY = 10        # fewer years -> region mean, then overall mean
 TRAIN_WINDOW_YEARS = 0          # 0 = all training years; e.g. 30 = last 30 years
+SAMPLE = "full"                 # "full" or "small" (only stations observed in 2025)
+FEATURE_SET = "team"            # "team" (shared candidate lists) or "all" (every column)
 
 # Grid searched on the 5 validation folds.
 #   C       : penalty for errors larger than epsilon (higher = less regularised)
@@ -99,10 +103,37 @@ PARAM_GRID = [
 DEFAULT_PARAMS = {"kernel": "rbf", "C": 10, "epsilon": 1.0, "gamma": 0.003}
 
 
-def choose_features(df):
-    """Pick features from the agreed candidate list (default: all of them).
-    `region` is not in the list (text); one-hot encode it here if wanted."""
-    return feature_columns(df)
+# Team candidate predictors per forecast date - the same lists as
+# src/models/linear_regression.py (main), so every model sees identical inputs.
+# Leaves out the data-quality counts (*_missing_days), relocations_before_season
+# and the February precipitation / sunshine / frost columns.
+COMMON_FEATURES = [
+    "latitude", "longitude", "elevation_m", "tmean_oct", "tmean_nov",
+    "tmean_dec", "tmean_jan", "tmax_jan", "tmin_jan",
+]
+TEAM_FEATURES = {"feb1": COMMON_FEATURES}
+TEAM_FEATURES["mar1"] = TEAM_FEATURES["feb1"] + [
+    "tmean_feb", "tmax_feb", "tmin_feb", "chill_days_0_7c_nov_feb",
+    "tmin_lowest_nov_feb", "gdd5_feb", "cum_tmax_feb", "cum_tmean_feb",
+]
+TEAM_FEATURES["mar15"] = TEAM_FEATURES["mar1"] + [
+    "tmean_mar1_14", "tmax_mar1_14", "tmin_mar1_14", "gdd5_mar1_14",
+    "cum_tmax_mar1_14", "cum_tmean_mar1_14", "chill_days_0_7c_mar1_14",
+    "frost_days_mar1_14", "precip_mar1_14_mm", "sunshine_mar1_14_h",
+    "cum_tmax_feb1_mar14",
+]
+
+
+def choose_features(df, forecast_date):
+    """Team candidate list for this forecast date (default), or every column in the
+    feature table with FEATURE_SET = "all". `region` is text and never used."""
+    if FEATURE_SET == "all":
+        return feature_columns(df)
+    features = TEAM_FEATURES[forecast_date]
+    missing = [c for c in features if c not in df.columns]
+    if missing:
+        raise KeyError(f"{forecast_date} feature table is missing {missing}")
+    return list(features)
 # ============================================================================
 
 
@@ -256,10 +287,22 @@ def bias_by_fold(df, features, params):
     return "  ".join(rows)
 
 
+def small_sample_stations():
+    """Stations with an observed full bloom in 2025 (same rule as the LR / RF scripts:
+    taken from the Mar 1 table so every forecast date uses the same stations)."""
+    mar1 = load_features("mar1")
+    observed = mar1["bloom_year"].eq(2025) & mar1[TARGET].notna()
+    return set(mar1.loc[observed, "station_id"].astype(str))
+
+
 def run_name():
     name = MODEL_NAME
     if TARGET_MODE == "raw":
         name += "_raw"
+    if SAMPLE == "small":
+        name += "_small"
+    if FEATURE_SET == "all":
+        name += "_allfeat"
     if TRAIN_WINDOW_YEARS:
         name += f"_train{TRAIN_WINDOW_YEARS}"
     return name
@@ -270,10 +313,13 @@ def run(forecast_date, do_tune, results_dir, df=None):
     its own feature table; default: load_features(forecast_date)."""
     name = run_name()
     df = load_features(forecast_date) if df is None else df
-    features = choose_features(df)
+    if SAMPLE == "small":
+        df = df[df["station_id"].astype(str).isin(small_sample_stations())].copy()
+    features = choose_features(df, forecast_date)
     setup = (f"target {TARGET_MODE}"
              + (f" (station ref: last {STATION_REF_YEARS} yrs)" if TARGET_MODE == "anomaly" else "")
-             + f" | train {'last %d years' % TRAIN_WINDOW_YEARS if TRAIN_WINDOW_YEARS else 'all years'}")
+             + f" | train {'last %d years' % TRAIN_WINDOW_YEARS if TRAIN_WINDOW_YEARS else 'all years'}"
+             + f" | {SAMPLE} sample ({df['station_id'].nunique()} stations, {len(df)} rows)")
 
     if do_tune:
         print(f"\nTuning {name} for {forecast_date}: {len(ParameterGrid(PARAM_GRID))} "
@@ -328,7 +374,7 @@ def run(forecast_date, do_tune, results_dir, df=None):
 
 
 def main():
-    global TARGET_MODE, TRAIN_WINDOW_YEARS
+    global TARGET_MODE, TRAIN_WINDOW_YEARS, SAMPLE, FEATURE_SET
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--no-tune", action="store_true",
                         help="skip the grid search and use DEFAULT_PARAMS")
@@ -336,9 +382,15 @@ def main():
                         help="predict the station anomaly (default) or the raw DOY")
     parser.add_argument("--train-window", type=int, default=TRAIN_WINDOW_YEARS,
                         help="train on the last N years of each fold (0 = all years)")
+    parser.add_argument("--sample", choices=["full", "small"], default=SAMPLE,
+                        help="full sample, or only stations observed in 2025")
+    parser.add_argument("--features", choices=["team", "all"], default=FEATURE_SET,
+                        help="team candidate lists (default) or every feature-table column")
     args = parser.parse_args()
     TARGET_MODE = args.target
     TRAIN_WINDOW_YEARS = args.train_window
+    SAMPLE = args.sample
+    FEATURE_SET = args.features
 
     results_dir = PROJECT_ROOT / "results" / "svr"
     results_dir.mkdir(parents=True, exist_ok=True)

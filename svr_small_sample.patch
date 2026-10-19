@@ -1,0 +1,78 @@
+diff --git a/src/models/svr.py b/src/models/svr.py
+index a8a714a..b58f549 100644
+--- a/src/models/svr.py
++++ b/src/models/svr.py
+@@ -4,6 +4,7 @@
+     python3 src/models/svr.py --no-tune          # skip tuning, use DEFAULT_PARAMS
+     python3 src/models/svr.py --target raw       # comparison: predict the raw DOY
+     python3 src/models/svr.py --train-window 30  # comparison: last 30 years only
++    python3 src/models/svr.py --sample small     # only stations observed in 2025
+ 
+   * data      : load_features() only (leakage-safe feb1 / mar1 tables)
+   * folds     : the 5 agreed expanding-window folds from cv_folds()
+@@ -73,6 +74,7 @@ TARGET_MODE = "anomaly"         # "anomaly" (default) or "raw"
+ STATION_REF_YEARS = 30          # years in the station reference (anomaly target)
+ MIN_STATION_HISTORY = 10        # fewer years -> region mean, then overall mean
+ TRAIN_WINDOW_YEARS = 0          # 0 = all training years; e.g. 30 = last 30 years
++SAMPLE = "full"                 # "full" or "small" (only stations observed in 2025)
+ 
+ # Grid searched on the 5 validation folds.
+ #   C       : penalty for errors larger than epsilon (higher = less regularised)
+@@ -256,10 +258,20 @@ def bias_by_fold(df, features, params):
+     return "  ".join(rows)
+ 
+ 
++def small_sample_stations():
++    """Stations with an observed full bloom in 2025 (same rule as the LR / RF scripts:
++    taken from the Mar 1 table so every forecast date uses the same stations)."""
++    mar1 = load_features("mar1")
++    observed = mar1["bloom_year"].eq(2025) & mar1[TARGET].notna()
++    return set(mar1.loc[observed, "station_id"].astype(str))
++
++
+ def run_name():
+     name = MODEL_NAME
+     if TARGET_MODE == "raw":
+         name += "_raw"
++    if SAMPLE == "small":
++        name += "_small"
+     if TRAIN_WINDOW_YEARS:
+         name += f"_train{TRAIN_WINDOW_YEARS}"
+     return name
+@@ -270,10 +282,13 @@ def run(forecast_date, do_tune, results_dir, df=None):
+     its own feature table; default: load_features(forecast_date)."""
+     name = run_name()
+     df = load_features(forecast_date) if df is None else df
++    if SAMPLE == "small":
++        df = df[df["station_id"].astype(str).isin(small_sample_stations())].copy()
+     features = choose_features(df)
+     setup = (f"target {TARGET_MODE}"
+              + (f" (station ref: last {STATION_REF_YEARS} yrs)" if TARGET_MODE == "anomaly" else "")
+-             + f" | train {'last %d years' % TRAIN_WINDOW_YEARS if TRAIN_WINDOW_YEARS else 'all years'}")
++             + f" | train {'last %d years' % TRAIN_WINDOW_YEARS if TRAIN_WINDOW_YEARS else 'all years'}"
++             + f" | {SAMPLE} sample ({df['station_id'].nunique()} stations, {len(df)} rows)")
+ 
+     if do_tune:
+         print(f"\nTuning {name} for {forecast_date}: {len(ParameterGrid(PARAM_GRID))} "
+@@ -328,7 +343,7 @@ def run(forecast_date, do_tune, results_dir, df=None):
+ 
+ 
+ def main():
+-    global TARGET_MODE, TRAIN_WINDOW_YEARS
++    global TARGET_MODE, TRAIN_WINDOW_YEARS, SAMPLE
+     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+     parser.add_argument("--no-tune", action="store_true",
+                         help="skip the grid search and use DEFAULT_PARAMS")
+@@ -336,9 +351,12 @@ def main():
+                         help="predict the station anomaly (default) or the raw DOY")
+     parser.add_argument("--train-window", type=int, default=TRAIN_WINDOW_YEARS,
+                         help="train on the last N years of each fold (0 = all years)")
++    parser.add_argument("--sample", choices=["full", "small"], default=SAMPLE,
++                        help="full sample, or only stations observed in 2025")
+     args = parser.parse_args()
+     TARGET_MODE = args.target
+     TRAIN_WINDOW_YEARS = args.train_window
++    SAMPLE = args.sample
+ 
+     results_dir = PROJECT_ROOT / "results" / "svr"
+     results_dir.mkdir(parents=True, exist_ok=True)
