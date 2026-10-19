@@ -29,27 +29,37 @@ JAPAN_VIEW = pdk.ViewState(latitude=36.8, longitude=137.5, zoom=4.2)
 
 
 def sakura_map(fc, selected=None):
-    """Pydeck map with a sakura flower per station; the selected station is drawn larger."""
+    """Pydeck map with a small sakura flower per station; the selected one is larger."""
     pts = fc[["station_id", "location", "prefecture", "latitude", "longitude",
               "predicted_date", "notice_days"]].copy()
     pts["forecast"] = pts["predicted_date"].dt.strftime("%d %b")
+    pts["notice_days"] = pts["notice_days"].astype(int)
+    pts = pts.drop(columns="predicted_date")
     pts["icon"] = [SAKURA_ICON] * len(pts)
-    pts["size"] = (pts["station_id"] == selected).map({True: 46, False: 26})
-    pts = pts.drop(columns="predicted_date").sort_values("size")   # selected on top
-    dots = pdk.Layer(   # small pink dot under each flower, so stations always show
-        "ScatterplotLayer", pts, get_position=["longitude", "latitude"],
-        get_fill_color=[217, 79, 134, 200], get_radius=4, radius_units="pixels",
-    )
-    flowers = pdk.Layer(
-        "IconLayer", pts, get_icon="icon", get_position=["longitude", "latitude"],
-        get_size="size", size_units="pixels", pickable=True,
-    )
+
+    def flowers(rows, px):
+        return pdk.Layer(
+            "IconLayer", rows, get_icon="icon", get_position=["longitude", "latitude"],
+            get_size=px, size_scale=1, size_units="pixels",
+            size_min_pixels=px, size_max_pixels=px, pickable=True,
+        )
+
+    layers = [
+        pdk.Layer(   # small pink dot under each flower, so stations always show
+            "ScatterplotLayer", pts, get_position=["longitude", "latitude"],
+            get_fill_color=[217, 79, 134, 200], get_radius=3, radius_units="pixels",
+            radius_min_pixels=3, radius_max_pixels=3,
+        ),
+        flowers(pts[pts["station_id"] != selected], 22),
+    ]
     view = JAPAN_VIEW
     if selected is not None and (pts["station_id"] == selected).any():
-        r = pts[pts["station_id"] == selected].iloc[0]
-        view = pdk.ViewState(latitude=float(r.latitude), longitude=float(r.longitude), zoom=6)
+        sel = pts[pts["station_id"] == selected]
+        layers.append(flowers(sel, 40))
+        view = pdk.ViewState(latitude=float(sel.latitude.iloc[0]),
+                             longitude=float(sel.longitude.iloc[0]), zoom=6)
     return pdk.Deck(
-        layers=[dots, flowers], initial_view_state=view,
+        layers=layers, initial_view_state=view,
         map_provider="carto", map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={"html": "<b>{location}</b>, {prefecture}<br/>Full bloom {forecast}"
                          "<br/>{notice_days} days' notice"},
@@ -189,8 +199,8 @@ with tabs[0]:
             col.metric(f"Issued {meta[d]['issue_label']}", "—")
             continue
         r = row.iloc[0]
-        col.metric(f"Issued {meta[d]['issue_label']}", r.predicted_date.strftime("%d %b"),
-                   f"{int(r.notice_days)} days' notice", delta_color="off")
+        col.metric(f"Issued {meta[d]['issue_label']} · {int(r.notice_days)} days' notice",
+                   r.predicted_date.strftime("%d %b"))
         if "observed_doy" in r and pd.notna(r.observed_doy):
             observed = r.observed_doy
     if observed is not None:
@@ -217,8 +227,8 @@ for tab, d in zip(tabs[1:], available):
         if sid is None:
             c1.metric("Stations", len(fc))
             first, last = fc.iloc[0], fc.iloc[-1]
-            c2.metric("Earliest bloom", first.predicted_date.strftime("%d %b"), first.location, delta_color="off")
-            c3.metric("Latest bloom", last.predicted_date.strftime("%d %b"), last.location, delta_color="off")
+            c2.metric(f"Earliest bloom · {first.location}", first.predicted_date.strftime("%d %b"))
+            c3.metric(f"Latest bloom · {last.location}", last.predicted_date.strftime("%d %b"))
             c4.metric("Median notice", f"{fc['notice_days'].median():.0f} days")
         else:
             r = fc[fc["station_id"] == sid].iloc[0]
@@ -227,8 +237,7 @@ for tab, d in zip(tabs[1:], available):
             c3.metric("Earlier / later than usual", f"{r.anomaly_days:+.1f} days")
             if "observed_doy" in r and pd.notna(r.observed_doy):
                 obs = pd.Timestamp(year, 1, 1) + pd.Timedelta(days=int(r.observed_doy) - 1)
-                c4.metric("Observed", obs.strftime("%d %b"), f"error {r.error_days:+.1f} days",
-                          delta_color="off")
+                c4.metric(f"Observed · forecast error {r.error_days:+.1f} days", obs.strftime("%d %b"))
             else:
                 c4.metric("Typical error", f"± {honest_error(m):.1f} days")
 
