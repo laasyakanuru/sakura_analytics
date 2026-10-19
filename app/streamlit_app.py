@@ -20,15 +20,9 @@ DATES = ("feb1", "mar1", "mar15")
 
 st.set_page_config(page_title="Sakura Yosoku", page_icon="🌸", layout="wide")
 
-PETAL = "M0,-6 C-20,-14 -22,-36 -9,-46 L0,-39 L9,-46 C22,-36 20,-14 0,-6 Z"
-SAKURA_SVG = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 100 100">'
-    '<g fill="#f9b4cf" stroke="#d94f86" stroke-width="2.5" stroke-linejoin="round">'
-    + "".join(f'<path d="{PETAL}" transform="rotate({a})"/>' for a in (0, 72, 144, 216, 288))
-    + '</g><circle r="8" fill="#fbe38e" stroke="#d94f86" stroke-width="2"/></svg>'
-)
+# Sakura icon (app/sakura.png, 128x128 transparent PNG) as a data URL for the map.
 SAKURA_ICON = {
-    "url": "data:image/svg+xml;base64," + base64.b64encode(SAKURA_SVG.encode()).decode(),
+    "url": "data:image/png;base64," + base64.b64encode((APP_DIR / "sakura.png").read_bytes()).decode(),
     "width": 128, "height": 128, "anchorY": 64,
 }
 JAPAN_VIEW = pdk.ViewState(latitude=36.8, longitude=137.5, zoom=4.2)
@@ -42,7 +36,11 @@ def sakura_map(fc, selected=None):
     pts["icon"] = [SAKURA_ICON] * len(pts)
     pts["size"] = (pts["station_id"] == selected).map({True: 46, False: 26})
     pts = pts.drop(columns="predicted_date").sort_values("size")   # selected on top
-    layer = pdk.Layer(
+    dots = pdk.Layer(   # small pink dot under each flower, so stations always show
+        "ScatterplotLayer", pts, get_position=["longitude", "latitude"],
+        get_fill_color=[217, 79, 134, 200], get_radius=4, radius_units="pixels",
+    )
+    flowers = pdk.Layer(
         "IconLayer", pts, get_icon="icon", get_position=["longitude", "latitude"],
         get_size="size", size_units="pixels", pickable=True,
     )
@@ -51,7 +49,7 @@ def sakura_map(fc, selected=None):
         r = pts[pts["station_id"] == selected].iloc[0]
         view = pdk.ViewState(latitude=float(r.latitude), longitude=float(r.longitude), zoom=6)
     return pdk.Deck(
-        layers=[layer], initial_view_state=view,
+        layers=[dots, flowers], initial_view_state=view,
         map_provider="carto", map_style=pdk.map_styles.CARTO_LIGHT,
         tooltip={"html": "<b>{location}</b>, {prefecture}<br/>Full bloom {forecast}"
                          "<br/>{notice_days} days' notice"},
