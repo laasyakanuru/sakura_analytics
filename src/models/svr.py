@@ -6,6 +6,7 @@
     python3 src/models/svr.py --train-window 30  # comparison: last 30 years only
     python3 src/models/svr.py --sample small     # only stations observed in 2025
     python3 src/models/svr.py --features all     # every column in the feature table
+    python3 src/models/svr.py --final-test --dates feb1 mar1   # one-off 2015-2025 test
 
   * data      : load_features() only (leakage-safe feb1 / mar1 tables)
   * folds     : the 5 agreed expanding-window folds from cv_folds()
@@ -374,7 +375,7 @@ def run(forecast_date, do_tune, results_dir, df=None):
 
 
 def main():
-    global TARGET_MODE, TRAIN_WINDOW_YEARS, SAMPLE, FEATURE_SET
+    global TARGET_MODE, TRAIN_WINDOW_YEARS, SAMPLE, FEATURE_SET, RUN_FINAL_TEST
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--no-tune", action="store_true",
                         help="skip the grid search and use DEFAULT_PARAMS")
@@ -386,14 +387,19 @@ def main():
                         help="full sample, or only stations observed in 2025")
     parser.add_argument("--features", choices=["team", "all"], default=FEATURE_SET,
                         help="team candidate lists (default) or every feature-table column")
+    parser.add_argument("--dates", nargs="+", choices=FORECAST_DATES, default=list(FORECAST_DATES),
+                        help="forecast dates to run (default: all three)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="also score the untouched 2015-2025 test years (run ONCE per model)")
     args = parser.parse_args()
+    RUN_FINAL_TEST = RUN_FINAL_TEST or args.final_test
     TARGET_MODE = args.target
     TRAIN_WINDOW_YEARS = args.train_window
     SAMPLE = args.sample
     FEATURE_SET = args.features
     results_dir = PROJECT_ROOT / "results" / "svr"
     results_dir.mkdir(parents=True, exist_ok=True)
-    for forecast_date in FORECAST_DATES:
+    for forecast_date in args.dates:
         run(forecast_date, not args.no_tune, results_dir)
 
 

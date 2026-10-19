@@ -2,3 +2,4 @@
 # (export_svr.py and batch_forecast.py use the repo's main requirements.txt.)
 streamlit>=1.36
 pandas
+pydeck

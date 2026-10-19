@@ -38,6 +38,7 @@ from svr import MIN_STATION_HISTORY, STATION_REF_YEARS, TEAM_FEATURES  # noqa: E
 DATES = ("feb1", "mar1", "mar15")
 ISSUE = {"feb1": ("1 Feb", 32), "mar1": ("1 Mar", 60), "mar15": ("15 Mar", 74)}  # label, day of year
 RESULTS = PROJECT_ROOT / "results" / "svr"
+BASELINE_TEST = PROJECT_ROOT / "outputs" / "baseline" / "baseline_test_metrics.csv"
 OUT_DIR = PROJECT_ROOT / "app" / "model"
 
 
@@ -49,6 +50,15 @@ def metrics(path, fold):
     row = df[df["fold"].astype(str) == fold].iloc[0]
     keys = ("MAE", "RMSE", "R2", "hit_rate_3d", "n")
     return ast.literal_eval(row["params"]), {k: float(row[k]) for k in keys}
+
+
+def baseline_test():
+    """30-year climatology on the same 2015-2025 test (identical for every date)."""
+    if not BASELINE_TEST.exists():
+        return None
+    df = pd.read_csv(BASELINE_TEST)
+    row = df[df["model"] == "30yr_climatology"].iloc[0]
+    return {k: float(row[k]) for k in ("MAE", "RMSE", "R2", "hit_rate_3d", "n")}
 
 
 def station_references(df):
@@ -99,6 +109,7 @@ def export(date):
         "sklearn_version": sklearn.__version__,
         "validation": validation,
         "test": test,
+        "baseline_test": baseline_test(),
         "station_reference_years": STATION_REF_YEARS,
         "station_reference": refs,
         "stations": {str(r.station_id): {"location": str(r.location),
@@ -112,6 +123,7 @@ def export(date):
     df[cols].to_csv(OUT_DIR / f"features_{date}.csv", index=False)
     print(f"{date}: {params} | validation MAE {validation['MAE']:.3f}"
           + (f" | test MAE {test['MAE']:.3f}" if test else " | no test run")
+          + (f" (climatology {meta['baseline_test']['MAE']:.3f})" if test and meta["baseline_test"] else "")
           + f" | median notice {lead.median():.0f} days | sklearn {sklearn.__version__}")
 
 

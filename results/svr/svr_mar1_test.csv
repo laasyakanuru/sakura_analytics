@@ -1,0 +1,2 @@
+model,forecast_date,params,fold,n,MAE,RMSE,R2,hit_rate_3d
+svr,mar1,"{'C': 1, 'epsilon': 2.0, 'gamma': 0.01, 'kernel': 'rbf'}",test,528,5.855836549053725,7.078400874105086,0.3466125675931807,0.2840909090909091
