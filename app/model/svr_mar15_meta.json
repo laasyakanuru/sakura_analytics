@@ -1,0 +1,543 @@
+{
+ "forecast_date": "mar15",
+ "params": {
+  "kernel": "rbf",
+  "C": 30,
+  "epsilon": 2.0,
+  "gamma": 0.003
+ },
+ "features": [
+  "latitude",
+  "longitude",
+  "elevation_m",
+  "tmean_oct",
+  "tmean_nov",
+  "tmean_dec",
+  "tmean_jan",
+  "tmax_jan",
+  "tmin_jan",
+  "tmean_feb",
+  "tmax_feb",
+  "tmin_feb",
+  "chill_days_0_7c_nov_feb",
+  "tmin_lowest_nov_feb",
+  "gdd5_feb",
+  "cum_tmax_feb",
+  "cum_tmean_feb",
+  "tmean_mar1_14",
+  "tmax_mar1_14",
+  "tmin_mar1_14",
+  "gdd5_mar1_14",
+  "cum_tmax_mar1_14",
+  "cum_tmean_mar1_14",
+  "chill_days_0_7c_mar1_14",
+  "frost_days_mar1_14",
+  "precip_mar1_14_mm",
+  "sunshine_mar1_14_h",
+  "cum_tmax_feb1_mar14"
+ ],
+ "trained_years": [
+  1964,
+  2025
+ ],
+ "n_rows": 4365,
+ "sklearn_version": "1.6.1",
+ "validation_mae_days": 2.95,
+ "station_reference_years": 30,
+ "station_reference": {
+  "836": 91.90283400809717,
+  "822": 91.90283400809717,
+  "597": 107.82978723404256,
+  "520": 107.82978723404256,
+  "677": 93.41897233201581,
+  "776": 93.90441176470588,
+  "892": 90.2,
+  "654": 92.9,
+  "631": 96.4,
+  "617": 108.5,
+  "672": 94.9090909090909,
+  "433": 132.36363636363637,
+  "637": 99.9090909090909,
+  "747": 96.75,
+  "755": 93.25,
+  "837": 91.90283400809717,
+  "663": 92.16666666666667,
+  "585": 112.08333333333333,
+  "581": 116.08333333333333,
+  "602": 106.58333333333333,
+  "428": 124.08333333333333,
+  "618": 103.08333333333333,
+  "612": 101.41666666666667,
+  "744": 94.23076923076923,
+  "740": 98.92307692307692,
+  "598": 99.76923076923077,
+  "778": 93.5,
+  "678": 97.61538461538461,
+  "843": 93.78571428571429,
+  "800": 91.21428571428571,
+  "675": 91.5,
+  "587": 107.35714285714286,
+  "600": 102.46666666666667,
+  "750": 97.52941176470588,
+  "770": 94.33333333333333,
+  "768": 93.66666666666667,
+  "765": 92.33333333333333,
+  "762": 93.06666666666666,
+  "670": 90.96666666666667,
+  "759": 93.03333333333333,
+  "746": 93.66666666666667,
+  "741": 93.8,
+  "761": 97.3,
+  "772": 93.0,
+  "891": 93.06666666666666,
+  "780": 93.3,
+  "807": 88.96666666666667,
+  "813": 90.86666666666666,
+  "815": 93.3,
+  "817": 91.0,
+  "819": 90.33333333333333,
+  "827": 94.93333333333334,
+  "830": 91.56666666666666,
+  "887": 92.13333333333334,
+  "662": 89.03333333333333,
+  "777": 91.53333333333333,
+  "656": 90.83333333333333,
+  "607": 96.9,
+  "648": 95.16666666666667,
+  "893": 87.6,
+  "412": 123.6,
+  "423": 128.0,
+  "430": 120.96666666666667,
+  "575": 114.93333333333334,
+  "582": 110.1,
+  "584": 112.0,
+  "588": 106.33333333333333,
+  "590": 101.76666666666667,
+  "595": 99.6,
+  "604": 101.73333333333333,
+  "605": 97.0,
+  "610": 104.2,
+  "615": 95.43333333333334,
+  "616": 95.8,
+  "624": 93.96666666666667,
+  "626": 92.7,
+  "629": 95.16666666666667,
+  "632": 91.36666666666666,
+  "636": 92.03333333333333,
+  "638": 91.33333333333333,
+  "651": 92.36666666666666,
+  "895": 93.76666666666667
+ },
+ "stations": {
+  "836": {
+   "location": "Yakushima",
+   "prefecture": "Kagoshima",
+   "region": "Kyushu"
+  },
+  "822": {
+   "location": "Nobeoka",
+   "prefecture": "Miyazaki",
+   "region": "Kyushu"
+  },
+  "597": {
+   "location": "Shirakawa",
+   "prefecture": "Fukushima",
+   "region": "Tohoku"
+  },
+  "520": {
+   "location": "Shinjo",
+   "prefecture": "Yamagata",
+   "region": "Tohoku"
+  },
+  "677": {
+   "location": "Miyakejima",
+   "prefecture": "Tokyo",
+   "region": "Kanto"
+  },
+  "776": {
+   "location": "Sumoto",
+   "prefecture": "Hyogo",
+   "region": "Kansai"
+  },
+  "892": {
+   "location": "Uwajima",
+   "prefecture": "Ehime",
+   "region": "Shikoku"
+  },
+  "654": {
+   "location": "Hamamatsu",
+   "prefecture": "Shizuoka",
+   "region": "Chubu"
+  },
+  "631": {
+   "location": "Tsuruga",
+   "prefecture": "Fukui",
+   "region": "Chubu"
+  },
+  "617": {
+   "location": "Takayama",
+   "prefecture": "Gifu",
+   "region": "Chubu"
+  },
+  "672": {
+   "location": "Tateyama",
+   "prefecture": "Chiba",
+   "region": "Kanto"
+  },
+  "433": {
+   "location": "Kutchan",
+   "prefecture": "Hokkaido",
+   "region": "Hokkaido"
+  },
+  "637": {
+   "location": "Iida",
+   "prefecture": "Nagano",
+   "region": "Chubu"
+  },
+  "747": {
+   "location": "Toyooka",
+   "prefecture": "Hyogo",
+   "region": "Kansai"
+  },
+  "755": {
+   "location": "Hamada",
+   "prefecture": "Shimane",
+   "region": "Chugoku"
+  },
+  "837": {
+   "location": "Tanegashima",
+   "prefecture": "Kagoshima",
+   "region": "Kyushu"
+  },
+  "663": {
+   "location": "Owase",
+   "prefecture": "Mie",
+   "region": "Kansai"
+  },
+  "585": {
+   "location": "Miyako",
+   "prefecture": "Iwate",
+   "region": "Tohoku"
+  },
+  "581": {
+   "location": "Hachinohe",
+   "prefecture": "Aomori",
+   "region": "Tohoku"
+  },
+  "602": {
+   "location": "Aikawa",
+   "prefecture": "Niigata",
+   "region": "Chubu"
+  },
+  "428": {
+   "location": "Esashi",
+   "prefecture": "Hokkaido",
+   "region": "Hokkaido"
+  },
+  "618": {
+   "location": "Matsumoto",
+   "prefecture": "Nagano",
+   "region": "Chubu"
+  },
+  "612": {
+   "location": "Takada",
+   "prefecture": "Niigata",
+   "region": "Chubu"
+  },
+  "744": {
+   "location": "Yonago",
+   "prefecture": "Tottori",
+   "region": "Chugoku"
+  },
+  "740": {
+   "location": "Saigo",
+   "prefecture": "Shimane",
+   "region": "Chugoku"
+  },
+  "598": {
+   "location": "Onahama",
+   "prefecture": "Fukushima",
+   "region": "Tohoku"
+  },
+  "778": {
+   "location": "Shionomisaki",
+   "prefecture": "Wakayama",
+   "region": "Kansai"
+  },
+  "678": {
+   "location": "Hachijojima",
+   "prefecture": "Tokyo",
+   "region": "Kanto"
+  },
+  "843": {
+   "location": "Fukue",
+   "prefecture": "Nagasaki",
+   "region": "Kyushu"
+  },
+  "800": {
+   "location": "Izuhara",
+   "prefecture": "Nagasaki",
+   "region": "Kyushu"
+  },
+  "675": {
+   "location": "Oshima",
+   "prefecture": "Tokyo",
+   "region": "Kanto"
+  },
+  "587": {
+   "location": "Sakata",
+   "prefecture": "Yamagata",
+   "region": "Tohoku"
+  },
+  "600": {
+   "location": "Wajima",
+   "prefecture": "Ishikawa",
+   "region": "Chubu"
+  },
+  "750": {
+   "location": "Maizuru",
+   "prefecture": "Kyoto",
+   "region": "Kansai"
+  },
+  "770": {
+   "location": "Kobe",
+   "prefecture": "Hyogo",
+   "region": "Kansai"
+  },
+  "768": {
+   "location": "Okayama",
+   "prefecture": "Okayama",
+   "region": "Chugoku"
+  },
+  "765": {
+   "location": "Hiroshima",
+   "prefecture": "Hiroshima",
+   "region": "Chugoku"
+  },
+  "762": {
+   "location": "Shimonoseki",
+   "prefecture": "Yamaguchi",
+   "region": "Chugoku"
+  },
+  "670": {
+   "location": "Yokohama",
+   "prefecture": "Kanagawa",
+   "region": "Kanto"
+  },
+  "759": {
+   "location": "Kyoto",
+   "prefecture": "Kyoto",
+   "region": "Kansai"
+  },
+  "746": {
+   "location": "Tottori",
+   "prefecture": "Tottori",
+   "region": "Chugoku"
+  },
+  "741": {
+   "location": "Matsue",
+   "prefecture": "Shimane",
+   "region": "Chugoku"
+  },
+  "761": {
+   "location": "Hikone",
+   "prefecture": "Shiga",
+   "region": "Kansai"
+  },
+  "772": {
+   "location": "Osaka",
+   "prefecture": "Osaka",
+   "region": "Kansai"
+  },
+  "891": {
+   "location": "Takamatsu",
+   "prefecture": "Kagawa",
+   "region": "Shikoku"
+  },
+  "780": {
+   "location": "Nara",
+   "prefecture": "Nara",
+   "region": "Kansai"
+  },
+  "807": {
+   "location": "Fukuoka",
+   "prefecture": "Fukuoka",
+   "region": "Kyushu"
+  },
+  "813": {
+   "location": "Saga",
+   "prefecture": "Saga",
+   "region": "Kyushu"
+  },
+  "815": {
+   "location": "Oita",
+   "prefecture": "Oita",
+   "region": "Kyushu"
+  },
+  "817": {
+   "location": "Nagasaki",
+   "prefecture": "Nagasaki",
+   "region": "Kyushu"
+  },
+  "819": {
+   "location": "Kumamoto",
+   "prefecture": "Kumamoto",
+   "region": "Kyushu"
+  },
+  "827": {
+   "location": "Kagoshima",
+   "prefecture": "Kagoshima",
+   "region": "Kyushu"
+  },
+  "830": {
+   "location": "Miyazaki",
+   "prefecture": "Miyazaki",
+   "region": "Kyushu"
+  },
+  "887": {
+   "location": "Matsuyama",
+   "prefecture": "Ehime",
+   "region": "Shikoku"
+  },
+  "662": {
+   "location": "Tokyo",
+   "prefecture": "Tokyo",
+   "region": "Kanto"
+  },
+  "777": {
+   "location": "Wakayama",
+   "prefecture": "Wakayama",
+   "region": "Kansai"
+  },
+  "656": {
+   "location": "Shizuoka",
+   "prefecture": "Shizuoka",
+   "region": "Chubu"
+  },
+  "607": {
+   "location": "Toyama",
+   "prefecture": "Toyama",
+   "region": "Chubu"
+  },
+  "648": {
+   "location": "Choshi",
+   "prefecture": "Chiba",
+   "region": "Kanto"
+  },
+  "893": {
+   "location": "Kochi",
+   "prefecture": "Kochi",
+   "region": "Shikoku"
+  },
+  "412": {
+   "location": "Sapporo",
+   "prefecture": "Hokkaido",
+   "region": "Hokkaido"
+  },
+  "423": {
+   "location": "Muroran",
+   "prefecture": "Hokkaido",
+   "region": "Hokkaido"
+  },
+  "430": {
+   "location": "Hakodate",
+   "prefecture": "Hokkaido",
+   "region": "Hokkaido"
+  },
+  "575": {
+   "location": "Aomori",
+   "prefecture": "Aomori",
+   "region": "Tohoku"
+  },
+  "582": {
+   "location": "Akita",
+   "prefecture": "Akita",
+   "region": "Tohoku"
+  },
+  "584": {
+   "location": "Morioka",
+   "prefecture": "Iwate",
+   "region": "Tohoku"
+  },
+  "588": {
+   "location": "Yamagata",
+   "prefecture": "Yamagata",
+   "region": "Tohoku"
+  },
+  "590": {
+   "location": "Sendai",
+   "prefecture": "Miyagi",
+   "region": "Tohoku"
+  },
+  "595": {
+   "location": "Fukushima",
+   "prefecture": "Fukushima",
+   "region": "Tohoku"
+  },
+  "604": {
+   "location": "Niigata",
+   "prefecture": "Niigata",
+   "region": "Chubu"
+  },
+  "605": {
+   "location": "Kanazawa",
+   "prefecture": "Ishikawa",
+   "region": "Chubu"
+  },
+  "610": {
+   "location": "Nagano",
+   "prefecture": "Nagano",
+   "region": "Chubu"
+  },
+  "615": {
+   "location": "Utsunomiya",
+   "prefecture": "Tochigi",
+   "region": "Kanto"
+  },
+  "616": {
+   "location": "Fukui",
+   "prefecture": "Fukui",
+   "region": "Chubu"
+  },
+  "624": {
+   "location": "Maebashi",
+   "prefecture": "Gunma",
+   "region": "Kanto"
+  },
+  "626": {
+   "location": "Kumagaya",
+   "prefecture": "Saitama",
+   "region": "Kanto"
+  },
+  "629": {
+   "location": "Mito",
+   "prefecture": "Ibaraki",
+   "region": "Kanto"
+  },
+  "632": {
+   "location": "Gifu",
+   "prefecture": "Gifu",
+   "region": "Chubu"
+  },
+  "636": {
+   "location": "Nagoya",
+   "prefecture": "Aichi",
+   "region": "Chubu"
+  },
+  "638": {
+   "location": "Kofu",
+   "prefecture": "Yamanashi",
+   "region": "Chubu"
+  },
+  "651": {
+   "location": "Tsu",
+   "prefecture": "Mie",
+   "region": "Kansai"
+  },
+  "895": {
+   "location": "Tokushima",
+   "prefecture": "Tokushima",
+   "region": "Shikoku"
+  }
+ }
+}
