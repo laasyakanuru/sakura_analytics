@@ -1,10 +1,13 @@
 {
  "forecast_date": "mar15",
+ "issue_label": "15 Mar",
+ "issue_doy": 74,
+ "typical_lead_days": 20.098717948717947,
  "params": {
-  "kernel": "rbf",
   "C": 30,
   "epsilon": 2.0,
-  "gamma": 0.003
+  "gamma": 0.003,
+  "kernel": "rbf"
  },
  "features": [
   "latitude",
@@ -42,7 +45,20 @@
  ],
  "n_rows": 4365,
  "sklearn_version": "1.6.1",
- "validation_mae_days": 2.95,
+ "validation": {
+  "MAE": 2.94971516239145,
+  "RMSE": 3.671381538175529,
+  "R2": 0.8823057951571677,
+  "hit_rate_3d": 0.597147036919704,
+  "n": 575.0
+ },
+ "test": {
+  "MAE": 3.717281397698868,
+  "RMSE": 4.665577586218315,
+  "R2": 0.716135358649373,
+  "hit_rate_3d": 0.4715909090909091,
+  "n": 528.0
+ },
  "station_reference_years": 30,
  "station_reference": {
   "836": 91.90283400809717,
