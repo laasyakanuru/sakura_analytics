@@ -36,3 +36,39 @@ class BloomPredictor:
         doy = reference + anomaly
         date = dt.date(int(year), 1, 1) + dt.timedelta(days=int(np.rint(doy)) - 1)
         return {"doy": doy, "date": date, "anomaly": anomaly, "reference": reference}
+
+    def predict_batch(self, rows, year):
+        """Score many stations at once. rows: DataFrame with station_id + the model
+        features (one row per station). Returns one forecast row per station."""
+        rows = rows.copy()
+        rows["station_id"] = rows["station_id"].astype(str)
+        missing = [f for f in self.features if f not in rows.columns]
+        if missing:
+            raise ValueError(f"missing feature columns: {', '.join(missing)}")
+        unknown = sorted(set(rows["station_id"]) - set(self.meta["station_reference"]))
+        if unknown:
+            raise ValueError(f"stations not in the model: {', '.join(unknown)}")
+        bad = rows[self.features].isna().any(axis=1)
+        if bad.any():
+            raise ValueError("missing feature values for stations: "
+                             + ", ".join(rows.loc[bad, "station_id"]))
+        reference = rows["station_id"].map(self.meta["station_reference"]).astype(float)
+        anomaly = self.model.predict(rows[self.features].astype(float))
+        doy = reference.to_numpy() + anomaly
+        start = pd.Timestamp(int(year), 1, 1)
+        info = pd.DataFrame.from_dict(self.meta["stations"], orient="index")
+        out = pd.DataFrame({
+            "station_id": rows["station_id"].to_numpy(),
+            "location": rows["station_id"].map(info["location"]).to_numpy(),
+            "prefecture": rows["station_id"].map(info["prefecture"]).to_numpy(),
+            "region": rows["station_id"].map(info["region"]).to_numpy(),
+            "latitude": rows["latitude"].to_numpy(),
+            "longitude": rows["longitude"].to_numpy(),
+            "year": int(year),
+            "reference_doy": reference.round(1).to_numpy(),
+            "anomaly_days": np.round(anomaly, 1),
+            "predicted_doy": np.round(doy, 1),
+            "predicted_date": [(start + pd.Timedelta(days=int(np.rint(d)) - 1)).date().isoformat()
+                               for d in doy],
+        })
+        return out.sort_values("predicted_doy").reset_index(drop=True)
