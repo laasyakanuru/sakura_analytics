@@ -1,11 +1,11 @@
-"""Batch forecast: score every station for one season and save the result.
+"""Batch forecast: score every station for one season and save a frozen copy.
 
-    python3 src/models/batch_forecast.py                     # latest season, all three dates
-    python3 src/models/batch_forecast.py --year 2024         # one past season, all dates
-    python3 src/models/batch_forecast.py --year 2026 --date feb1 --input data/new_feb1.csv
+    python3 src/models/batch_forecast.py                     # latest season, deployed model(s)
+    python3 src/models/batch_forecast.py --year 2024
+    python3 src/models/batch_forecast.py --year 2026 --date mar15 --input data/new_mar15.csv
 
-Run once per forecast issue date (1 Feb, 1 Mar, 15 Mar). The Streamlit app reads
-the saved files, so every viewer sees the same frozen forecast.
+The Streamlit app computes forecasts itself; this script keeps an archived copy of
+what was issued (e.g. run on 15 March each season).
 
 --input: a CSV with station_id plus that date's model features, one row per
 station (for a season that is not in the feature table yet). Needs --date.
@@ -61,12 +61,13 @@ def run(date, year, input_csv=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--year", type=int, help="bloom year (default: latest in the feature table)")
-    parser.add_argument("--date", choices=DATES, help="one forecast date (default: all three)")
+    parser.add_argument("--date", choices=DATES, help="one forecast date (default: every exported model)")
     parser.add_argument("--input", type=Path, help="CSV of station_id + features for a new season")
     args = parser.parse_args()
     if args.input and not args.date:
         parser.error("--input needs --date (each date uses different features)")
-    for date in ([args.date] if args.date else DATES):
+    exported = [d for d in DATES if (PROJECT_ROOT / "app" / "model" / f"svr_{d}.joblib").exists()]
+    for date in ([args.date] if args.date else exported):
         run(date, args.year, args.input)
 
 

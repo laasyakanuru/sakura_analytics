@@ -1,7 +1,11 @@
-"""Train the best SVR for each forecast date on ALL years and save it for the app.
+"""Train the deployed SVR on ALL years and save it for the app.
 
-    python3 src/models/export_svr.py                 # all three dates
-    python3 src/models/export_svr.py --date mar15    # just one
+    python3 src/models/export_svr.py                 # the deployed model (15 Mar)
+    python3 src/models/export_svr.py --date feb1     # another date, e.g. for analysis
+
+Only the 15 March model is deployed: on the 2015-2025 test the 1 Feb and 1 Mar
+models did not beat the 30-year climatology, so the app uses the usual date for
+planning before 15 March (see src/models/rolling_test.py).
 
 For each date the settings and validation metrics are read from the committed
 results/svr/svr_<date>_cv.csv (full sample, team candidate predictors), and the
@@ -36,9 +40,11 @@ from model_data import TARGET, load_features  # noqa: E402
 from svr import MIN_STATION_HISTORY, STATION_REF_YEARS, TEAM_FEATURES  # noqa: E402
 
 DATES = ("feb1", "mar1", "mar15")
+DEPLOYED = ("mar15",)
 ISSUE = {"feb1": ("1 Feb", 32), "mar1": ("1 Mar", 60), "mar15": ("15 Mar", 74)}  # label, day of year
 RESULTS = PROJECT_ROOT / "results" / "svr"
 BASELINE_TEST = PROJECT_ROOT / "outputs" / "baseline" / "baseline_test_metrics.csv"
+ROLLING_TEST = RESULTS / "svr_rolling_summary.csv"
 OUT_DIR = PROJECT_ROOT / "app" / "model"
 
 
@@ -59,6 +65,16 @@ def baseline_test():
     df = pd.read_csv(BASELINE_TEST)
     row = df[df["model"] == "30yr_climatology"].iloc[0]
     return {k: float(row[k]) for k in ("MAE", "RMSE", "R2", "hit_rate_3d", "n")}
+
+
+def rolling_test(date):
+    """Rolling-origin test 2015-2025 (refit every year) for this date, by method, if run."""
+    if not ROLLING_TEST.exists():
+        return None
+    df = pd.read_csv(ROLLING_TEST)
+    df = df[df["forecast_date"] == date]
+    keys = ("MAE", "RMSE", "R2", "hit_rate_3d", "bias", "n")
+    return {r["method"]: {k: float(r[k]) for k in keys} for _, r in df.iterrows()} or None
 
 
 def station_references(df):
@@ -110,6 +126,7 @@ def export(date):
         "validation": validation,
         "test": test,
         "baseline_test": baseline_test(),
+        "rolling_test": rolling_test(date),
         "station_reference_years": STATION_REF_YEARS,
         "station_reference": refs,
         "stations": {str(r.station_id): {"location": str(r.location),
@@ -129,9 +146,10 @@ def export(date):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--date", choices=DATES, help="export one date only")
+    parser.add_argument("--date", choices=DATES,
+                        help=f"export this date instead of the deployed {', '.join(DEPLOYED)}")
     args = parser.parse_args()
-    for date in ([args.date] if args.date else DATES):
+    for date in ([args.date] if args.date else DEPLOYED):
         export(date)
 
 

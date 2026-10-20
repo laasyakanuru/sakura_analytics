@@ -1,5 +1,8 @@
-# The app only reads saved forecasts, so it does not need scikit-learn.
-# (export_svr.py and batch_forecast.py use the repo's main requirements.txt.)
+# The app runs the deployed SVR models, so scikit-learn must match the version
+# that saved app/model/svr_<date>.joblib (see "sklearn_version" in the meta files).
 streamlit>=1.36
+scikit-learn==1.6.1
+numpy
 pandas
+joblib
 pydeck

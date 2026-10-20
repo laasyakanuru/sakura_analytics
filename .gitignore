@@ -10,3 +10,8 @@ venv/
 
 # Local MySQL credentials (copy sql/.env.example to sql/.env)
 .env
+
+# MLflow local tracking store (python3 src/models/log_models.py)
+mlflow.db
+mlruns/
+mlartifacts/
