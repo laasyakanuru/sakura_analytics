@@ -1,0 +1,33 @@
+--- a/src/02_preprocess/02_clean_weather_and_features.py
++++ b/src/02_preprocess/02_clean_weather_and_features.py
+@@ -52,8 +52,8 @@
+ DATES_DIR = PROJECT_DIR / "data/processed/01_source_data/02_sakura_dates"
+ OUT_DIR = PROJECT_DIR / "data/processed/02_cleaned_source_data/weather"
+ 
+-START, END = "1952-01-01", "2025-12-31"
+-FIRST_SEASON, LAST_SEASON = 1953, 2025
++START, END = "1952-01-01", "2026-06-30"
++FIRST_SEASON, LAST_SEASON = 1953, 2026
+ 
+ TEMP_VARS = ["mean_temperature_c", "maximum_temperature_c", "minimum_temperature_c"]
+ OTHER_VARS = ["precipitation_mm", "sunshine_duration_hours"]
+@@ -95,8 +95,8 @@
+         df = pd.read_csv(DATES_DIR / name, dtype={"station_id": str}, encoding="utf-8-sig")
+         df[col] = pd.to_datetime(df[col], format="%d/%m/%Y")
+         return df
+-    fl = read("02_01_sakura_flowering_1953_2025.csv", "bloom_date").rename(columns={"bloom_date": "flowering_date"})
+-    fb = read("02_02_sakura_full_bloom_1953_2025.csv", "full_bloom_date")
++    fl = read("02_01_sakura_flowering_1953_2026.csv", "bloom_date").rename(columns={"bloom_date": "flowering_date"})
++    fb = read("02_02_sakura_full_bloom_1953_2026.csv", "full_bloom_date")
+     d = fl.merge(fb, on=["station_id", "year"], how="outer")
+     d["flowering_doy"] = d.flowering_date.dt.dayofyear
+     d["full_bloom_doy"] = d.full_bloom_date.dt.dayofyear
+@@ -407,7 +407,7 @@
+         old.unlink()
+     out_daily = out(daily).copy()
+     out_daily["date"] = out_daily.date.dt.strftime("%Y-%m-%d")
+-    out_daily.to_csv(OUT_DIR / "02_cleaned_weather_daily_somei_1952_2025.csv.gz", index=False, na_rep="",
++    out_daily.to_csv(OUT_DIR / "02_cleaned_weather_daily_somei_1952_2026.csv.gz", index=False, na_rep="",
+                      compression={"method": "gzip", "mtime": 0})
+     out(features).to_csv(OUT_DIR / "03_weather_features_somei_station_year.csv", index=False, na_rep="")
+     out(gap_log).to_csv(OUT_DIR / "04_weather_gap_log_somei.csv", index=False)
