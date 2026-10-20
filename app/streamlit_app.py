@@ -23,6 +23,10 @@ from predictor import BloomPredictor
 
 APP_DIR = Path(__file__).resolve().parent
 MODEL_DIR = APP_DIR / "model"
+REPO_DIR = APP_DIR.parent
+# seasons after the model's training years: feature tables committed by the data pipeline
+NEW_SEASONS = {2026: REPO_DIR / "data" / "forward_2026" / "model" / "model_features_mar15_2026.csv"}
+OBSERVED = ["full_bloom_doy", "full_bloom_date"]   # never passed to the model
 DATE = "mar15"            # the deployed forecast
 LOOKBACK, MIN_HISTORY = 30, 10
 
@@ -93,12 +97,24 @@ def load_predictor():
     return BloomPredictor(DATE) if (MODEL_DIR / f"svr_{DATE}.joblib").exists() else None
 
 
+@st.cache_data
+def season_table():
+    """The model's feature table plus any newer seasons in NEW_SEASONS.
+    Observed bloom stays in the table for scoring only; forecast() drops it before predicting."""
+    base = load_predictor().table
+    frames = [base]
+    for y, path in NEW_SEASONS.items():
+        if path.exists() and not (base["bloom_year"] == y).any():
+            frames.append(pd.read_csv(path, dtype={"station_id": str}))
+    return pd.concat(frames, ignore_index=True)
+
+
 @st.cache_data(show_spinner="Working out the usual dates…")
 def usual_dates(year):
     """Stage 1: each station's usual date for `year` = mean full-bloom DOY over the 30 seasons
     before it (region mean if a station has < 10 of them, else the overall mean).
     Stations: those observed in `year`, or for an upcoming season those observed last season."""
-    table = load_predictor().table
+    table = season_table()
     hist = table[table["bloom_year"].between(year - LOOKBACK, year - 1)]
     stations = table[table["bloom_year"] == year]
     if stations.empty:
@@ -121,10 +137,11 @@ def usual_dates(year):
 def forecast(year):
     """Stage 2: cloud inference with the deployed SVR for every station with data this season."""
     bp = load_predictor()
-    rows = bp.table[bp.table["bloom_year"] == year]
+    table = season_table()
+    rows = table[table["bloom_year"] == year]
     if rows.empty:
         return None
-    fc = bp.predict_batch(rows, year)
+    fc = bp.predict_batch(rows.drop(columns=OBSERVED, errors="ignore"), year)
     observed = rows.set_index("station_id")["full_bloom_doy"]
     fc["observed_doy"] = fc["station_id"].map(observed)
     fc["error_days"] = (fc["predicted_doy"] - fc["observed_doy"]).round(1)
@@ -141,6 +158,7 @@ if bp is None:
     st.stop()
 
 meta = bp.meta
+trained_end = int(meta["trained_years"][1])
 if meta["sklearn_version"] != sklearn.__version__:
     st.warning(f"The model was saved with scikit-learn {meta['sklearn_version']} but this app runs "
                f"{sklearn.__version__}; pin the same version in app/requirements.txt.")
@@ -151,8 +169,9 @@ plan_acc = rolling.get("clim_rolling") or meta.get("baseline_test")
 svr_acc = rolling.get("svr_C_rolling") or meta.get("test") or meta["validation"]
 window = int(np.ceil(plan_acc["MAE"])) if plan_acc else 5
 
-last = int(bp.table["bloom_year"].max())
-seasons = [last + 1] + sorted(bp.table["bloom_year"].unique().tolist(), reverse=True)
+all_seasons = season_table()["bloom_year"]
+last = int(all_seasons.max())
+seasons = [last + 1] + sorted(all_seasons.unique().tolist(), reverse=True)
 year = st.selectbox("Season", seasons, index=1,
                     format_func=lambda y: f"{y} (upcoming)" if y > last else str(y))
 plan = usual_dates(int(year))
@@ -205,9 +224,13 @@ with how:
         c2.metric("Confirm · 15 Mar forecast", "from 15 Mar")
     if pd.notna(p.observed_doy):
         c3.metric("Observed full bloom", doy_to_date(year, p.observed_doy).strftime("%d %b"))
-        st.caption("For past seasons the 15 March model had seen these years in training, so its "
-                   "match looks better than a true forecast would. Use the errors above as the honest "
-                   "accuracy.")
+        if year > trained_end:
+            st.caption(f"The model never saw {year} in training: this is a true forecast, "
+                       "scored against the observed bloom.")
+        else:
+            st.caption("For past seasons the 15 March model had seen these years in training, so its "
+                       "match looks better than a true forecast would. Use the errors above as the "
+                       "honest accuracy.")
 
 # ------------------------------------------------------------------ stage 1: plan
 with plan_tab:
@@ -265,6 +288,16 @@ with confirm_tab:
             c2.metric(f"Earliest · {fc.iloc[0].location}", fc.iloc[0].predicted_date.strftime("%d %b"))
             c3.metric(f"Latest · {fc.iloc[-1].location}", fc.iloc[-1].predicted_date.strftime("%d %b"))
             c4.metric("Median notice", f"{fc['notice_days'].median():.0f} days")
+            if fc["observed_doy"].notna().any():
+                scored = fc.dropna(subset=["observed_doy"])
+                usual = plan.set_index("station_id").loc[scored["station_id"], "error_days"]
+                note = (" · not in training: a true forecast" if year > trained_end else
+                        " · the model saw this season in training, so this flatters it")
+                st.markdown(f"**{year} season score:** forecast off by "
+                            f"{scored['error_days'].abs().mean():.2f} days on average vs "
+                            f"{usual.abs().mean():.2f} for the usual date · "
+                            f"{(scored['error_days'].abs() <= 3).mean():.0%} within ±3 days "
+                            f"({len(scored)} stations){note}")
         else:
             r = fc[fc["station_id"] == sid].iloc[0]
             c1.metric("Forecast full bloom", r.predicted_date.strftime("%d %b %Y"))
