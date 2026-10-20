@@ -1,6 +1,8 @@
-# scikit-learn must match the version that saved app/model/svr_mar15.joblib
+# The app runs the deployed SVR models, so scikit-learn must match the version
+# that saved app/model/svr_<date>.joblib (see "sklearn_version" in the meta files).
 streamlit>=1.36
 scikit-learn==1.6.1
 numpy
 pandas
 joblib
+pydeck
